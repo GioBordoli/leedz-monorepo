@@ -23,10 +23,16 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// API routes will be added here
+// Import routes
+import authRoutes from './routes/authRoutes';
+
+// API routes
 app.get('/api', (_req, res) => {
   res.json({ message: 'Leedz API Server - Ready for lead generation!' });
 });
+
+// Authentication routes
+app.use('/auth', authRoutes);
 
 // Error handling middleware
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

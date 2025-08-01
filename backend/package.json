@@ -9,7 +9,11 @@
     "dev": "nodemon src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["lead-generation", "saas", "google-places"],
+  "keywords": [
+    "lead-generation",
+    "saas",
+    "google-places"
+  ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",

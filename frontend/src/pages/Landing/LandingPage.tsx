@@ -1,5 +1,6 @@
 import React from 'react';
 import { Play } from 'lucide-react';
+import GoogleLoginButton from '../../components/auth/GoogleLoginButton';
 
 const LandingPage: React.FC = () => {
   return (
@@ -75,9 +76,9 @@ const LandingPage: React.FC = () => {
                   Real-time lead generation
                 </li>
               </ul>
-              <button className="w-full bg-green-bright text-white py-3 px-6 rounded-lg font-semibold hover:bg-green-600 transition-colors">
+              <GoogleLoginButton>
                 Start Generating Leads
-              </button>
+              </GoogleLoginButton>
             </div>
 
             {/* Yearly Plan */}
@@ -117,9 +118,9 @@ const LandingPage: React.FC = () => {
                   Priority support
                 </li>
               </ul>
-              <button className="w-full bg-green-bright text-white py-3 px-6 rounded-lg font-semibold hover:bg-green-600 transition-colors">
+              <GoogleLoginButton>
                 Start Generating Leads
-              </button>
+              </GoogleLoginButton>
             </div>
           </div>
         </div>
