@@ -88,8 +88,9 @@ class AuthController {
       // Generate JWT token
       const jwtToken = this.generateJWT(user);
 
+      // FIXME: CRITICAL - Store refresh token in database for session management
+      // TODO: Implement refresh token rotation for security
       // Store refresh token for later use (you'll want to store this in database)
-      // TODO: Store tokens.refresh_token in database when implemented
 
       // Redirect to frontend with token
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
@@ -121,6 +122,7 @@ class AuthController {
 
     const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
 
+    // FIXME: Remove type assertion and fix JWT typing issue properly
     return jwt.sign(payload, secret, { expiresIn } as any);
   };
 

@@ -35,8 +35,12 @@ app.get('/api', (_req, res) => {
 app.use('/auth', authRoutes);
 
 // Error handling middleware
+// FIXME: SECURITY - Error handler may leak sensitive information in stack traces
+// TODO: Implement proper error logging service (e.g., Sentry, LogRocket)
+// TODO: Add rate limiting middleware to prevent DoS attacks
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err.stack);
+  // TODO: Don't expose stack traces in production
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
