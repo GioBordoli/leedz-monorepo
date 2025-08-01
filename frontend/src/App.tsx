@@ -6,9 +6,9 @@ import './App.css';
 function App() {
   return (
     <AuthProvider>
-      <div className="App">
+    <div className="App">
         <LandingPage />
-      </div>
+    </div>
     </AuthProvider>
   );
 }
