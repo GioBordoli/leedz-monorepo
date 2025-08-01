@@ -169,11 +169,11 @@ const PricingSection: React.FC = () => {
               size="lg"
               className="w-full mb-4"
               onClick={() => {
-                // TODO: Connect to auth flow
-                console.log('Start generating leads clicked');
+                const element = document.getElementById('pricing');
+                element?.scrollIntoView({ behavior: 'smooth' });
               }}
             >
-              Start generating leads
+              Start now
             </Button>
           </motion.div>
 

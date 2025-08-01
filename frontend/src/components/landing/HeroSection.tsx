@@ -16,9 +16,9 @@ const HeroSection: React.FC = () => {
   };
 
   const mockSheetData = [
-    { name: "Joe's Pizza", address: "123 Main St, New York, NY", phone: "(555) 123-4567", website: "joespizza.com" },
-    { name: "Elite Fitness Gym", address: "456 Oak Ave, Brooklyn, NY", phone: "(555) 234-5678", website: "elitefitness.com" },
-    { name: "Sunrise Dental", address: "789 Pine Rd, Queens, NY", phone: "(555) 345-6789", website: "sunrisedental.com" },
+    { name: "Joe's Plumbing Company", address: "123 Main St, New York, NY", phone: "(555) 123-4567", website: "joesplumbing.com" },
+    { name: "Joe's Cousin's Plumbing Co.", address: "456 Oak Ave, Brooklyn, NY", phone: "(555) 234-5678", website: "joescplumbing.com" },
+    { name: "Joe's Cousin's Cousin's Plumbing Co.", address: "789 Pine Rd, Queens, NY", phone: "(555) 345-6789", website: "joesccplumbing.com" },
   ];
 
   return (
@@ -47,7 +47,7 @@ const HeroSection: React.FC = () => {
             className="text-lg lg:text-xl text-gray-600 mb-8 max-w-2xl mx-auto lg:mx-0"
             variants={itemVariants}
           >
-            Bring your own Google Places key. We don't store your data.{' '}
+            Bring your own key. We don't store your data.{' '}
             <strong className="text-text-dark">
               6,000 qualified leads in 60 days for $58—or you don't pay.
             </strong>
@@ -62,12 +62,12 @@ const HeroSection: React.FC = () => {
               variant="primary"
               size="lg"
               onClick={() => {
-                // TODO: Connect to auth flow
-                console.log('Start free clicked');
+                const element = document.getElementById('pricing');
+                element?.scrollIntoView({ behavior: 'smooth' });
               }}
               className="group"
             >
-              Start free
+              Start now
               <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
             </Button>
             <Button
@@ -117,7 +117,7 @@ const HeroSection: React.FC = () => {
                 <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
                 <div className="w-3 h-3 bg-green-400 rounded-full"></div>
                 <div className="ml-4 text-sm font-medium text-gray-700">
-                  Leads - New York Restaurants
+                  Leads - New York Plumbers
                 </div>
               </div>
             </div>

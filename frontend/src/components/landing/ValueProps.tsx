@@ -148,20 +148,20 @@ const ValueProps: React.FC = () => {
           <h3 className="text-2xl font-semibold text-text-dark mb-4">
             Ready to 10x your lead generation?
           </h3>
-          <p className="text-gray-600 mb-6">
-            Join 500+ agencies already generating millions of leads with Leedz.
-          </p>
-          <motion.button
-            className="bg-mint-gradient text-white px-8 py-4 rounded-full font-semibold text-lg hover:shadow-lg hover:shadow-mint/25 transition-all duration-300"
-            onClick={() => {
-              // TODO: Connect to auth flow
-              console.log('Get started clicked');
-            }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            Get started for free →
-          </motion.button>
+                     <p className="text-gray-600 mb-6">
+             Start generating high-quality leads today with Leedz.
+           </p>
+                     <motion.button
+             className="bg-mint-gradient text-white px-8 py-4 rounded-full font-semibold text-lg hover:shadow-lg hover:shadow-mint/25 transition-all duration-300"
+             onClick={() => {
+               const element = document.getElementById('pricing');
+               element?.scrollIntoView({ behavior: 'smooth' });
+             }}
+             whileHover={{ scale: 1.05 }}
+             whileTap={{ scale: 0.95 }}
+           >
+             Start now →
+           </motion.button>
         </motion.div>
       </motion.div>
     </Section>

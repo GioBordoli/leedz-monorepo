@@ -83,11 +83,11 @@ const Header: React.FC = () => {
               variant="primary"
               size="sm"
               onClick={() => {
-                // TODO: Connect to auth flow
-                console.log('Start free clicked');
+                const element = document.getElementById('pricing');
+                element?.scrollIntoView({ behavior: 'smooth' });
               }}
             >
-              Start free
+              Start now
             </Button>
           </div>
 
@@ -138,12 +138,12 @@ const Header: React.FC = () => {
                 variant="primary"
                 size="sm"
                 onClick={() => {
-                  // TODO: Connect to auth flow
-                  console.log('Start free clicked');
+                  const element = document.getElementById('pricing');
+                  element?.scrollIntoView({ behavior: 'smooth' });
                 }}
                 className="w-full"
               >
-                Start free
+                Start now
               </Button>
             </div>
           </div>

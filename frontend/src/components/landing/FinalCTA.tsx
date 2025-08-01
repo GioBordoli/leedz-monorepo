@@ -54,13 +54,13 @@ const FinalCTA: React.FC = () => {
         </motion.h2>
 
         {/* Subheadline */}
-        <motion.p
-          className="text-lg lg:text-xl text-gray-300 mb-8 max-w-2xl mx-auto leading-relaxed"
-          variants={itemVariants}
-        >
-          Join 500+ agencies already using Leedz to generate millions of leads. 
-          Set up takes 2 minutes. First 1,000 leads are on us.
-        </motion.p>
+                 <motion.p
+           className="text-lg lg:text-xl text-gray-300 mb-8 max-w-2xl mx-auto leading-relaxed"
+           variants={itemVariants}
+         >
+           The fastest way to generate qualified leads at scale. 
+           Set up takes 2 minutes. Get started today.
+         </motion.p>
 
         {/* Stats */}
         <motion.div
@@ -87,12 +87,12 @@ const FinalCTA: React.FC = () => {
             variant="primary"
             size="lg"
             onClick={() => {
-              // TODO: Connect to auth flow
-              console.log('Start free clicked from final CTA');
+              const element = document.getElementById('pricing');
+              element?.scrollIntoView({ behavior: 'smooth' });
             }}
             className="text-xl px-12 py-4 shadow-2xl hover:shadow-mint/30 group"
           >
-            Start free
+            Start now
             <ArrowRight className="w-6 h-6 ml-3 group-hover:translate-x-2 transition-transform" />
           </Button>
         </motion.div>

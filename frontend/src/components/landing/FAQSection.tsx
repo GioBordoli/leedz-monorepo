@@ -136,17 +136,17 @@ const FAQSection: React.FC = () => {
               Our team is here to help you get the most out of Leedz.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <motion.button
-                className="bg-mint-gradient text-white px-6 py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-mint/25 transition-all duration-300"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  // TODO: Connect to auth flow
-                  console.log('Get started clicked');
-                }}
-              >
-                Get started now
-              </motion.button>
+                             <motion.button
+                 className="bg-mint-gradient text-white px-6 py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-mint/25 transition-all duration-300"
+                 whileHover={{ scale: 1.05 }}
+                 whileTap={{ scale: 0.95 }}
+                 onClick={() => {
+                   const element = document.getElementById('pricing');
+                   element?.scrollIntoView({ behavior: 'smooth' });
+                 }}
+               >
+                 Start now
+               </motion.button>
               <motion.a
                 href="mailto:support@leedz.online"
                 className="bg-gray-100 text-gray-700 px-6 py-3 rounded-full font-semibold hover:bg-gray-200 transition-colors"

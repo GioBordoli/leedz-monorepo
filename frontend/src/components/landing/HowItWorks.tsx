@@ -148,18 +148,18 @@ const HowItWorks: React.FC = () => {
         >
           Ready to get started?
         </motion.p>
-        <motion.button
-          className="bg-mint-gradient text-white px-8 py-4 rounded-full font-semibold text-lg hover:shadow-lg hover:shadow-mint/25 hover:scale-105 transition-all duration-300"
-          onClick={() => {
-            // TODO: Connect to auth flow
-            console.log('Start generating leads clicked');
-          }}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          variants={itemVariants}
-        >
-          Start generating leads →
-        </motion.button>
+                 <motion.button
+           className="bg-mint-gradient text-white px-8 py-4 rounded-full font-semibold text-lg hover:shadow-lg hover:shadow-mint/25 hover:scale-105 transition-all duration-300"
+           onClick={() => {
+             const element = document.getElementById('pricing');
+             element?.scrollIntoView({ behavior: 'smooth' });
+           }}
+           whileHover={{ scale: 1.05 }}
+           whileTap={{ scale: 0.95 }}
+           variants={itemVariants}
+         >
+           Start now →
+         </motion.button>
       </motion.div>
     </Section>
   );

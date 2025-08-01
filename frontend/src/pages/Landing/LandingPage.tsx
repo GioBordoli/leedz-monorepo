@@ -1,7 +1,7 @@
 import React from 'react';
 import Header from '../../components/layout/Header';
 import HeroSection from '../../components/landing/HeroSection';
-import SocialProof from '../../components/landing/SocialProof';
+// import SocialProof from '../../components/landing/SocialProof';
 import HowItWorks from '../../components/landing/HowItWorks';
 import ValueProps from '../../components/landing/ValueProps';
 import DemoSection from '../../components/landing/DemoSection';
@@ -19,8 +19,8 @@ const LandingPage: React.FC = () => {
       {/* Hero Section */}
       <HeroSection />
 
-      {/* Social Proof */}
-      <SocialProof />
+      {/* Social Proof - Temporarily removed until we have real agencies */}
+      {/* <SocialProof /> */}
 
       {/* How It Works */}
       <HowItWorks />
