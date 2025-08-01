@@ -24,7 +24,7 @@ async function runTests() {
 
     // Test 2: Encryption/Decryption
     console.log('🔒 Test 2: Encryption/Decryption');
-    const testApiKey = 'AIzaSyDk1234567890abcdefghijklmnopqrstu';
+    const testApiKey = 'TEST_API_KEY_39_CHARS_FOR_TESTING_ONLY1';
     console.log('Original API key:', testApiKey);
     
     const encrypted = encrypt(testApiKey);

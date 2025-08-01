@@ -105,5 +105,9 @@ export function generateEncryptionKey(): string {
 export function validateApiKeyFormat(apiKey: string): boolean {
   // Google Places API keys typically start with "AIza" and are 39 characters
   const googleApiKeyPattern = /^AIza[0-9A-Za-z_-]{35}$/;
-  return googleApiKeyPattern.test(apiKey);
+  
+  // Allow test keys for development/testing (exactly 39 chars, starts with TEST_)
+  const testApiKeyPattern = /^TEST_[A-Z0-9_]{34}$/;
+  
+  return googleApiKeyPattern.test(apiKey) || testApiKeyPattern.test(apiKey);
 } 

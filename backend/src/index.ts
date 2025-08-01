@@ -25,6 +25,7 @@ app.get('/health', (_req, res) => {
 
 // Import routes
 import authRoutes from './routes/authRoutes';
+import userRoutes from './routes/userRoutes';
 
 // API routes
 app.get('/api', (_req, res) => {
@@ -33,6 +34,9 @@ app.get('/api', (_req, res) => {
 
 // Authentication routes
 app.use('/auth', authRoutes);
+
+// User management routes (protected)
+app.use('/api/user', userRoutes);
 
 // Error handling middleware
 // FIXME: SECURITY - Error handler may leak sensitive information in stack traces
