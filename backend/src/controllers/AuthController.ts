@@ -1,18 +1,22 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { google } from 'googleapis';
-import UserModel from '../models/UserModel'; // Added import for UserModel
+import { UserModel, User } from '../models/User'; // Fix import path and import both UserModel class and User interface
 
-interface User {
-  id: string;
+interface AuthenticatedRequest extends Request {
+  user?: User;
+}
+
+// 🆕 Interface for JWT payload with additional auth fields
+interface JWTPayload {
+  id: number;
   email: string;
   name: string;
   picture?: string;
   googleId: string;
-}
-
-interface AuthenticatedRequest extends Request {
-  user?: User;
+  hasCompletedOnboarding?: boolean;
+  isFirstLogin?: boolean;
+  needsOnboarding?: boolean;
 }
 
 class AuthController {
@@ -84,7 +88,6 @@ class AuthController {
       if (isFirstLogin) {
         // Create new user
         user = await UserModel.create({
-          id: userInfo.data.id || '',
           email: userInfo.data.email,
           name: userInfo.data.name || '',
           picture: userInfo.data.picture || undefined,
@@ -93,8 +96,15 @@ class AuthController {
         console.log('✅ New user created:', userInfo.data.email);
       } else {
         // Update existing user's last login
-        await UserModel.updateLastLogin(user.id);
-        console.log('✅ Returning user login updated:', userInfo.data.email);
+        if (user) {
+          await UserModel.updateLastLogin(user.id);
+          console.log('✅ Returning user login updated:', userInfo.data.email);
+        }
+      }
+
+      // Ensure user is not null after creation/update
+      if (!user) {
+        throw new Error('User creation or retrieval failed');
       }
 
       // 🆕 ENHANCED JWT TOKEN WITH ONBOARDING STATE
@@ -128,13 +138,16 @@ class AuthController {
   /**
    * Generate JWT token for user
    */
-  generateJWT = (user: User): string => {
-    const payload = {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      picture: user.picture,
-      googleId: user.googleId
+  generateJWT = (payload: JWTPayload): string => {
+    const jwtPayload = {
+      id: payload.id,
+      email: payload.email,
+      name: payload.name,
+      picture: payload.picture,
+      googleId: payload.googleId,
+      hasCompletedOnboarding: payload.hasCompletedOnboarding,
+      isFirstLogin: payload.isFirstLogin,
+      needsOnboarding: payload.needsOnboarding
     };
 
     const secret = process.env.JWT_SECRET;
@@ -144,8 +157,7 @@ class AuthController {
 
     const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
 
-    // FIXME: Remove type assertion and fix JWT typing issue properly
-    return jwt.sign(payload, secret, { expiresIn } as any);
+    return jwt.sign(jwtPayload, secret, { expiresIn } as jwt.SignOptions);
   };
 
   /**
@@ -162,7 +174,16 @@ class AuthController {
       }
 
       // Generate new JWT token
-      const newToken = this.generateJWT(user);
+      const newToken = this.generateJWT({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        picture: user.picture,
+        googleId: user.google_oauth_id,
+        hasCompletedOnboarding: user.has_completed_onboarding,
+        isFirstLogin: false, // This will be handled by the frontend
+        needsOnboarding: !user.has_completed_onboarding
+      });
 
       res.json({
         success: true,
