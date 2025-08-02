@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { google } from 'googleapis';
+import UserModel from '../models/UserModel'; // Added import for UserModel
 
 interface User {
   id: string;
@@ -76,17 +77,38 @@ class AuthController {
         return;
       }
 
-      // Create user object
-      const user: User = {
-        id: userInfo.data.id || '',
-        email: userInfo.data.email,
-        name: userInfo.data.name || '',
-        picture: userInfo.data.picture || undefined,
-        googleId: userInfo.data.id || ''
-      };
+      // 🆕 ENHANCED USER CREATION/UPDATE LOGIC
+      let user = await UserModel.findByGoogleId(userInfo.data.id || '');
+      const isFirstLogin = !user;
 
-      // Generate JWT token
-      const jwtToken = this.generateJWT(user);
+      if (isFirstLogin) {
+        // Create new user
+        user = await UserModel.create({
+          id: userInfo.data.id || '',
+          email: userInfo.data.email,
+          name: userInfo.data.name || '',
+          picture: userInfo.data.picture || undefined,
+          google_oauth_id: userInfo.data.id || ''
+        });
+        console.log('✅ New user created:', userInfo.data.email);
+      } else {
+        // Update existing user's last login
+        await UserModel.updateLastLogin(user.id);
+        console.log('✅ Returning user login updated:', userInfo.data.email);
+      }
+
+      // 🆕 ENHANCED JWT TOKEN WITH ONBOARDING STATE
+      const jwtToken = this.generateJWT({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        picture: user.picture,
+        googleId: user.google_oauth_id,
+        // 🆕 Include onboarding status in token
+        hasCompletedOnboarding: user.has_completed_onboarding,
+        isFirstLogin,
+        needsOnboarding: !user.has_completed_onboarding
+      });
 
       // FIXME: CRITICAL - Store refresh token in database for session management
       // TODO: Implement refresh token rotation for security

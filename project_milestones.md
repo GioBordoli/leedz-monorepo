@@ -268,76 +268,156 @@ CREATE TABLE sheet_configs (
 
 ---
 
-## 🎨 Milestone 4: Landing Page (Week 4)
+## 🎨 Milestone 4: Landing Page (Week 4) ✅ **COMPLETED - August 2, 2025**
 **Goal**: Create high-converting landing page with pricing
 
-### Issue 4.1: Landing Page Layout
+### Issue 4.1: Landing Page Layout ✅ **COMPLETED**
 **Priority**: Critical | **Effort**: 8 hours | **Assignee**: Junior Dev
 
 **Description**: Build the main landing page with hero section, video space, and pricing cards.
 
-**Acceptance Criteria**:
-- [ ] Create responsive hero section
-- [ ] Add video embed placeholder (empty div for now)
-- [ ] Design pricing cards (2 options: $29/month, $99/year)
-- [ ] Implement call-to-action buttons
-- [ ] Use white background with translucent green accents
+**Acceptance Criteria**: ✅ ALL COMPLETE
+- [x] Create responsive hero section
+- [x] Add video embed placeholder (empty div for now)
+- [x] Design pricing cards (2 options: $29/month, $99/year)
+- [x] Implement call-to-action buttons
+- [x] Use white background with translucent green accents
 
-**Page Sections**:
-1. **Hero Section**
-   - Headline: "Leads From Coast to Coast - Unlimited Leads"
-   - Subheadline: "Can you even call all these leads? Leads overload."
-   - Challenge: "6000 qualified leads in 2 months for $58 or you don't pay"
+**Implementation Notes**:
+- Complete landing page with 8 sections: Hero, How It Works, Value Props, Demo, Pricing, FAQ, Final CTA, Footer
+- Responsive design with Framer Motion animations
+- Professional pricing section with yearly/monthly toggle and $249 savings badge
 
-2. **Video Section**
-   - Large placeholder div for screen recording
-   - Play button overlay (non-functional for now)
-
-3. **Pricing Section**
-   - Two cards side by side
-   - Monthly ($29) vs Yearly ($99) 
-   - "Start Generating Leads" buttons
-
-**File**: `frontend/src/pages/Landing/LandingPage.tsx`
-
-### Issue 4.2: Pricing Components
+### Issue 4.2: Pricing Components ✅ **COMPLETED**
 **Priority**: High | **Effort**: 4 hours | **Assignee**: Junior Dev
 
 **Description**: Create reusable pricing card components.
 
-**Acceptance Criteria**:
-- [ ] Create `PricingCard` component
-- [ ] Implement hover effects and animations
-- [ ] Add "Most Popular" badge for yearly plan
-- [ ] Connect CTA buttons to authentication flow
+**Acceptance Criteria**: ✅ ALL COMPLETE
+- [x] Create `PricingCard` component
+- [x] Implement hover effects and animations
+- [x] Add "Most Popular" badge for yearly plan
+- [x] Connect CTA buttons to authentication flow
 
-**Component Props**:
-```typescript
-interface PricingCardProps {
-  title: string;
-  price: string;
-  period: string;
-  features: string[];
-  isPopular?: boolean;
-  onSelect: () => void;
-}
-```
+**Implementation Notes**:
+- Sophisticated pricing component with Framer Motion animations
+- Toggle between monthly ($29) and yearly ($99) pricing
+- Integrated with authentication service for seamless signup flow
 
-### Issue 4.3: Landing Page Animations
+### Issue 4.3: Landing Page Animations ✅ **COMPLETED**
 **Priority**: Medium | **Effort**: 3 hours | **Assignee**: Junior Dev
 
 **Description**: Add subtle animations and micro-interactions.
 
-**Acceptance Criteria**:
-- [ ] Fade-in animations on scroll
-- [ ] Hover effects on pricing cards
-- [ ] Smooth scrolling between sections
-- [ ] Button hover states with translucent green
+**Acceptance Criteria**: ✅ ALL COMPLETE
+- [x] Fade-in animations on scroll
+- [x] Hover effects on pricing cards
+- [x] Smooth scrolling between sections
+- [x] Button hover states with translucent green
 
-**Technical Implementation**:
-- Use CSS transitions (300ms ease-in-out)
-- Add hover transforms on cards
-- Implement scroll-triggered animations
+**Implementation Notes**:
+- Framer Motion integration with staggered animations
+- Professional hover effects and micro-interactions
+- Smooth section transitions and mint color hover states
+
+---
+
+## 🚀 Milestone 4.5: Essential Platform UI & Onboarding (Week 4.5) ✅ **COMPLETED - August 2, 2025**
+**Goal**: Create post-auth user journey and essential platform structure
+
+### Issue 4.5.1: Router Setup and Navigation Structure ✅ **COMPLETED**
+**Priority**: Critical | **Effort**: 3 hours | **Assignee**: Junior Dev
+
+**Description**: Set up React Router and create the foundational navigation structure for the platform.
+
+**Acceptance Criteria**: ✅ ALL COMPLETE
+- [x] Install and configure React Router v6
+- [x] Create protected route wrapper for authenticated areas
+- [x] Set up main layout component with header and navigation
+- [x] Implement logout functionality in header
+- [x] Create route structure for dashboard, settings, onboarding
+
+**Implementation Notes**:
+- Comprehensive routing with protected routes
+- Smart authentication-based navigation
+- Clean header and layout components
+
+### Issue 4.5.2: Post-Auth Onboarding Flow ✅ **COMPLETED**
+**Priority**: Critical | **Effort**: 4 hours | **Assignee**: Junior Dev
+
+**Description**: Create onboarding flow for new users to set up their Google Places API key.
+
+**Acceptance Criteria**: ✅ ALL COMPLETE (ENHANCED)
+- [x] Create multi-step onboarding page
+- [x] Add welcome message and platform explanation
+- [x] Include video placeholder for API key setup tutorial
+- [x] Implement API key input field with validation
+- [x] Add "Test API Key" functionality to verify key works
+- [x] Redirect to dashboard only after successful API key validation
+- [x] Store onboarding completion status
+
+**🚀 MAJOR ENHANCEMENT**: Implemented **backend-driven user state management**:
+- ✅ Database migration for onboarding tracking (`has_completed_onboarding`, `onboarding_completed_at`)
+- ✅ Enhanced AuthController with new vs returning user detection
+- ✅ Smart routing: new users see required onboarding, returning users get optional onboarding
+- ✅ Eliminated localStorage dependency for production-grade state management
+- ✅ OnboardingPrompt component for returning users who haven't completed setup
+
+### Issue 4.5.3: Dashboard Shell with User Navigation ✅ **COMPLETED**
+**Priority**: Critical | **Effort**: 3 hours | **Assignee**: Junior Dev
+
+**Description**: Build the main dashboard layout and navigation structure.
+
+**Acceptance Criteria**: ✅ ALL COMPLETE
+- [x] Create dashboard layout with sidebar navigation
+- [x] Add user profile section in header (name, email, logout)
+- [x] Implement navigation menu (Dashboard, Settings)
+- [x] Add welcome message for first-time dashboard visitors
+- [x] Include video placeholder for platform tutorial
+- [x] Show "Coming Soon" messages for features not yet built
+- [x] Add usage counter placeholder (0/1000 leads today)
+
+**Implementation Notes**:
+- Professional dashboard with comprehensive navigation
+- User profile integration with Google OAuth data
+- Clear status indicators for upcoming features
+
+### Issue 4.5.4: Settings Page with API Key Management ✅ **COMPLETED**
+**Priority**: High | **Effort**: 3 hours | **Assignee**: Junior Dev
+
+**Description**: Create settings page for users to manage their API keys and account information.
+
+**Acceptance Criteria**: ✅ ALL COMPLETE
+- [x] Create tabbed settings interface
+- [x] Implement "API Configuration" tab with key management
+- [x] Add ability to update/change Google Places API key
+- [x] Mask API key display (show only last 4 characters)
+- [x] Include API key testing functionality
+- [x] Add "Account Information" tab with user profile
+- [x] Show account creation date and basic stats
+
+**Implementation Notes**:
+- Full settings page with API key management
+- Secure key masking and validation
+- User profile management interface
+
+### Issue 4.5.5: Legal Pages (Privacy & Terms) ✅ **COMPLETED**
+**Priority**: Medium | **Effort**: 2 hours | **Assignee**: Junior Dev
+
+**Description**: Create required legal pages for production Google OAuth compliance.
+
+**Acceptance Criteria**: ✅ ALL COMPLETE
+- [x] Create Privacy Policy page with Google OAuth disclosures
+- [x] Create Terms of Service page
+- [x] Add footer component with links to legal pages
+- [x] Ensure pages are accessible without authentication
+- [x] Include proper contact information and company details
+- [x] Make pages responsive and well-formatted
+
+**Implementation Notes**:
+- Complete legal compliance for Google OAuth production approval
+- Professional legal pages with proper disclosures
+- Accessible footer navigation
 
 ---
 
@@ -801,6 +881,14 @@ interface StreamingTerminalProps {
 
 ## 🎯 Success Metrics
 
+**By the end of Milestone 4.5:**
+- Users complete onboarding flow after signup
+- Zero users get "lost" after authentication  
+- Users successfully set up Google Places API keys
+- Dashboard provides clear navigation and next steps
+- Settings allow API key management and updates
+- Legal pages ensure production compliance
+
 **By the end of all milestones:**
 - Users can sign up with Google OAuth
 - Users can configure their Google Places API key
@@ -811,5 +899,20 @@ interface StreamingTerminalProps {
 - Billing system charges $29/month or $99/year
 - Landing page converts visitors effectively
 
-**Total Estimated Timeline**: 14 weeks for junior developer
-**Total Estimated Effort**: ~200 hours
+**Total Estimated Timeline**: 14.5 weeks for junior developer
+**Total Estimated Effort**: ~215 hours
+
+**Updated Milestone Sequence**:
+- Week 1: Project Foundation & Setup
+- Week 2: Authentication System  
+- Week 3: Database & User Management
+- Week 4: Landing Page
+- **Week 4.5: Essential Platform UI & Onboarding** ✨ *NEW*
+- Week 5-6: Google Places Integration
+- Week 7: Google Sheets Integration
+- Week 8-9: Dashboard & Search Interface
+- Week 10: Real-time Streaming Interface
+- Week 11: Settings & API Management
+- Week 12: Billing Integration
+- Week 13: Testing & Quality Assurance
+- Week 14: Deployment & Launch

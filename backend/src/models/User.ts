@@ -11,6 +11,11 @@ export interface User {
   subscription_status: 'active' | 'inactive' | 'cancelled';
   daily_usage_count: number;
   usage_reset_date: Date;
+  // 🆕 NEW ONBOARDING TRACKING FIELDS
+  has_completed_onboarding: boolean;
+  onboarding_completed_at?: Date;
+  first_login_at: Date;
+  last_login_at: Date;
   created_at: Date;
   updated_at: Date;
 }
@@ -27,6 +32,10 @@ export interface UpdateUserData {
   picture?: string;
   places_api_key?: string;
   subscription_status?: 'active' | 'inactive' | 'cancelled';
+  // 🆕 NEW ONBOARDING UPDATE FIELDS
+  has_completed_onboarding?: boolean;
+  onboarding_completed_at?: Date;
+  last_login_at?: Date;
 }
 
 export class UserModel {
@@ -35,8 +44,8 @@ export class UserModel {
    */
   static async create(userData: CreateUserData): Promise<User> {
     const query = `
-      INSERT INTO users (email, name, picture, google_oauth_id)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO users (email, name, picture, google_oauth_id, first_login_at, last_login_at)
+      VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       RETURNING *
     `;
     
@@ -135,6 +144,22 @@ export class UserModel {
       values.push(updateData.subscription_status);
     }
 
+    // 🆕 NEW ONBOARDING FIELDS
+    if (updateData.has_completed_onboarding !== undefined) {
+      fields.push(`has_completed_onboarding = $${paramCount++}`);
+      values.push(updateData.has_completed_onboarding);
+    }
+
+    if (updateData.onboarding_completed_at !== undefined) {
+      fields.push(`onboarding_completed_at = $${paramCount++}`);
+      values.push(updateData.onboarding_completed_at);
+    }
+
+    if (updateData.last_login_at !== undefined) {
+      fields.push(`last_login_at = $${paramCount++}`);
+      values.push(updateData.last_login_at);
+    }
+
     if (fields.length === 0) {
       throw new Error('No fields to update');
     }
@@ -157,6 +182,50 @@ export class UserModel {
     } catch (error) {
       console.error('❌ Failed to update user:', error);
       throw new Error('Failed to update user');
+    }
+  }
+
+  // 🆕 NEW METHOD: Complete onboarding for a user
+  /**
+   * Mark user as having completed onboarding
+   */
+  static async completeOnboarding(id: number): Promise<User | null> {
+    const query = `
+      UPDATE users 
+      SET has_completed_onboarding = TRUE,
+          onboarding_completed_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+      RETURNING *
+    `;
+
+    try {
+      const result = await database.query(query, [id]);
+      console.log('✅ User completed onboarding:', id);
+      return result.rows[0] || null;
+    } catch (error) {
+      console.error('❌ Failed to complete onboarding:', error);
+      throw new Error('Failed to complete onboarding');
+    }
+  }
+
+  // 🆕 NEW METHOD: Update last login timestamp
+  /**
+   * Update user's last login timestamp
+   */
+  static async updateLastLogin(id: number): Promise<void> {
+    const query = `
+      UPDATE users 
+      SET last_login_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+    `;
+
+    try {
+      await database.query(query, [id]);
+    } catch (error) {
+      console.error('❌ Failed to update last login:', error);
+      throw new Error('Failed to update last login');
     }
   }
 

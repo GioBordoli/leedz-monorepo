@@ -70,6 +70,9 @@ router.delete('/account',
   userController.deleteAccount
 );
 
+// POST /api/user/complete-onboarding - Mark onboarding as completed
+router.post('/complete-onboarding', authenticateJWT, userController.completeOnboarding);
+
 // TODO: Add routes for sheet configuration management
 // TODO: Add billing/subscription management routes
 // FIXME: Implement comprehensive rate limiting with Redis for production

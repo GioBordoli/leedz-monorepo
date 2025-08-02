@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Check, Zap } from 'lucide-react';
+import { Check, Zap, UserPlus } from 'lucide-react';
+import authService from '../../services/authService';
 import Button from '../common/Button';
 import Section from '../common/Section';
 
@@ -167,13 +168,11 @@ const PricingSection: React.FC = () => {
             <Button
               variant="primary"
               size="lg"
-              className="w-full mb-4"
-              onClick={() => {
-                const element = document.getElementById('pricing');
-                element?.scrollIntoView({ behavior: 'smooth' });
-              }}
+              className="w-full mb-4 flex items-center justify-center space-x-2"
+              onClick={() => authService.login()}
             >
-              Start now
+              <UserPlus className="w-5 h-5" />
+              <span>Sign up</span>
             </Button>
           </motion.div>
 

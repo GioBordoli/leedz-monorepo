@@ -95,23 +95,31 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
   // Check for token in URL (OAuth callback) on mount
   useEffect(() => {
     const checkAuthStatus = async () => {
+      console.log('🔍 AUTH CONTEXT: Starting auth check...');
+      
       try {
         // Check if we have a token from OAuth callback
         const tokenFromURL = authService.extractTokenFromURL();
+        console.log('🔍 AUTH CONTEXT: Token from URL:', tokenFromURL ? 'Found' : 'Not found');
         
         if (tokenFromURL) {
+          console.log('🔍 AUTH CONTEXT: Attempting to get user info...');
           // Get user info with the token
           const user = await authService.getCurrentUser(tokenFromURL);
+          console.log('🔍 AUTH CONTEXT: User info received:', user);
+          
           dispatch({
             type: 'LOGIN_SUCCESS',
             payload: { user, token: tokenFromURL }
           });
+          console.log('✅ AUTH CONTEXT: Login success dispatched');
         } else {
-          // No token found, user is not authenticated
+          console.log('🔍 AUTH CONTEXT: No token found, checking for existing session...');
+          // TODO: Check for existing session in localStorage or cookies
           dispatch({ type: 'SET_LOADING', payload: false });
         }
       } catch (error) {
-        console.error('Auth check failed:', error);
+        console.error('❌ AUTH CONTEXT: Auth check failed:', error);
         dispatch({
           type: 'LOGIN_ERROR',
           payload: error instanceof Error ? error.message : 'Authentication failed'
