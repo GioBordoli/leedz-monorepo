@@ -278,13 +278,21 @@ const Onboarding: React.FC = () => {
               Email Support
             </a>
             <span className="text-gray-300">|</span>
-            <a href="#" className="text-mint hover:text-mint/80 font-medium">
+            <button 
+              type="button"
+              onClick={() => alert('Help Center coming soon!')}
+              className="text-mint hover:text-mint/80 font-medium bg-transparent border-none cursor-pointer"
+            >
               Help Center
-            </a>
+            </button>
             <span className="text-gray-300">|</span>
-            <a href="#" className="text-mint hover:text-mint/80 font-medium">
+            <button 
+              type="button"
+              onClick={() => alert('Live Chat coming soon!')}
+              className="text-mint hover:text-mint/80 font-medium bg-transparent border-none cursor-pointer"
+            >
               Live Chat
-            </a>
+            </button>
           </div>
         </div>
       </main>

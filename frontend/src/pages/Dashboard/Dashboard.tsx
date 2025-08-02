@@ -7,7 +7,6 @@ import {
   LogOut, 
   User, 
   Play,
-  ExternalLink,
   Database,
   Zap
 } from 'lucide-react';
