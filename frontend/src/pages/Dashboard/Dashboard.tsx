@@ -1,6 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import SearchForm from '../../components/leads/SearchForm';
+import SearchResults from '../../components/leads/SearchResults';
+import leadService, { SearchParams, SearchResult, UsageStats } from '../../services/leadService';
+import userService from '../../services/userService';
 import { 
   Search, 
   Settings as SettingsIcon, 
@@ -8,12 +12,67 @@ import {
   User, 
   Play,
   Database,
-  Zap
+  Zap,
+  AlertTriangle
 } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
   const navigate = useNavigate();
+  const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
+  const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load usage stats and API key status on component mount
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      if (!token) return; // Wait for token to be available
+      
+      // Load usage stats (non-critical)
+      try {
+        const stats = await leadService.getUsageStats(token);
+        setUsageStats(stats);
+        console.log('🔍 DASHBOARD DEBUG - Usage stats loaded successfully:', stats);
+      } catch (err) {
+        console.warn('⚠️ Usage stats failed to load, but continuing...', err);
+        // Don't fail the whole flow for usage stats
+      }
+      
+      // Load API key status (critical for UI state)
+      try {
+        const apiKeyStatus = await userService.getApiKeyStatus(token);
+        
+        // DEBUG: Log what we received
+        console.log('🔍 DASHBOARD DEBUG - API key status loaded successfully:', apiKeyStatus);
+        console.log('   Extracting has_key:', apiKeyStatus?.api_key_status?.has_key);
+        
+        setApiKeyConfigured(apiKeyStatus.api_key_status.has_key);
+        
+        console.log('🔍 DASHBOARD DEBUG - State updated:');
+        console.log('   apiKeyConfigured set to:', apiKeyStatus.api_key_status.has_key);
+      } catch (err) {
+        console.error('❌ Failed to load API key status:', err);
+        console.log('🔍 DASHBOARD DEBUG - API key status error, setting apiKeyConfigured to false');
+        setApiKeyConfigured(false);
+      }
+    };
+
+    loadDashboardData();
+
+    // Refresh data when window regains focus (e.g., coming back from Settings)
+    const handleWindowFocus = () => {
+      loadDashboardData();
+    };
+
+    window.addEventListener('focus', handleWindowFocus);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('focus', handleWindowFocus);
+    };
+  }, [token]); // Re-run when token changes
 
   const handleLogout = async () => {
     try {
@@ -21,6 +80,33 @@ const Dashboard: React.FC = () => {
       navigate('/');
     } catch (error) {
       console.error('Logout failed:', error);
+    }
+  };
+
+  const handleSearch = async (params: SearchParams) => {
+    if (!token) {
+      setError('Authentication token not available');
+      return;
+    }
+
+    try {
+      setIsSearching(true);
+      setError(null);
+      console.log('🔍 Starting search:', params);
+      
+      const result = await leadService.searchLeads(params, token);
+      setSearchResult(result);
+      
+      // Update usage stats after successful search
+      const updatedStats = await leadService.getUsageStats(token);
+      setUsageStats(updatedStats);
+      
+    } catch (err) {
+      console.error('Search failed:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Search failed';
+      setError(errorMessage);
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -76,108 +162,124 @@ const Dashboard: React.FC = () => {
           </p>
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* Main Action - Coming Soon */}
-          <div className="md:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-mint rounded-lg">
-                  <Search className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-ink">Lead Generation</h3>
-                  <p className="text-sm text-gray-600">Find businesses in your target area</p>
+        {/* Error Display */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center space-x-2">
+            <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
+            <div>
+              <p className="text-sm text-red-700 font-medium">Search Error</p>
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Main Search Interface */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* Search Form */}
+          <div className="lg:col-span-1">
+            <SearchForm 
+              onSearch={handleSearch}
+              isSearching={isSearching}
+              apiKeyConfigured={apiKeyConfigured}
+            />
+            
+            {/* API Key Warning */}
+            {!apiKeyConfigured && (
+              <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm text-yellow-700 font-medium">API Key Required</p>
+                    <p className="text-sm text-yellow-600 mb-2">
+                      You need to add your Google Places API key before you can search for leads.
+                    </p>
+                    <Link 
+                      to="/settings"
+                      className="text-sm text-yellow-700 font-medium hover:text-yellow-800 underline"
+                    >
+                      Add API Key in Settings →
+                    </Link>
+                  </div>
                 </div>
               </div>
-              <span className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
-                Coming Soon
-              </span>
-            </div>
-            <p className="text-gray-600 text-sm mb-4">
-              This feature will allow you to search for businesses using Google Places API and stream results directly to your Google Sheets.
-            </p>
-            <button 
-              disabled
-              className="w-full bg-gray-100 text-gray-400 py-2 px-4 rounded-lg font-medium cursor-not-allowed"
-            >
-              Start Lead Search
-            </button>
+            )}
           </div>
 
+          {/* Search Results */}
+          <div className="lg:col-span-2">
+            <SearchResults 
+              searchResult={searchResult}
+              isSearching={isSearching}
+            />
+          </div>
+        </div>
+
+        {/* Quick Access */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           {/* Settings Quick Access */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center space-x-3 mb-4">
-              <div className="p-2 bg-slate-custom-500 rounded-lg">
+              <div className="p-2 bg-mint rounded-lg">
                 <SettingsIcon className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-ink">Settings</h3>
-                <p className="text-sm text-gray-600">Manage your API keys</p>
+                <h3 className="text-lg font-semibold text-ink">Settings & API Key</h3>
+                <p className="text-sm text-gray-600">Manage your API configuration</p>
               </div>
             </div>
             <p className="text-gray-600 text-sm mb-4">
-              Configure your Google Places API key and other settings.
+              Configure your Google Places API key and manage your account settings.
             </p>
             <Link 
               to="/settings"
-              className="w-full bg-ink text-white py-2 px-4 rounded-lg font-medium hover:bg-ink/90 transition-colors flex items-center justify-center"
+              className="w-full bg-mint text-white py-2 px-4 rounded-lg font-medium hover:bg-mint/90 transition-colors flex items-center justify-center"
             >
               Open Settings
             </Link>
           </div>
-        </div>
 
-        {/* Tutorial Section */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
-          <div className="flex items-center space-x-3 mb-4">
-            <div className="p-2 bg-blue-500 rounded-lg">
-              <Play className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-ink">Getting Started Tutorial</h3>
-              <p className="text-sm text-gray-600">Learn how to set up your Google Cloud API key</p>
-            </div>
-          </div>
-          
-          <div className="bg-gray-100 rounded-lg p-4 mb-4">
-            <div className="aspect-video bg-gray-200 rounded-lg flex items-center justify-center">
-              <div className="text-center">
-                <Play className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                <p className="text-gray-500 font-medium">Tutorial Video</p>
-                <p className="text-gray-400 text-sm">Coming soon</p>
+          {/* Tutorial Section */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-6">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="p-2 bg-blue-500 rounded-lg">
+                <Play className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-ink">Getting Started</h3>
+                <p className="text-sm text-gray-600">Learn how to use Leedz</p>
               </div>
             </div>
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <p className="text-gray-600 text-sm">
-              Watch this 5-minute tutorial to learn how to get your Google Places API key and start generating leads.
+            <p className="text-gray-600 text-sm mb-4">
+              Watch our tutorial to learn how to get your Google Places API key and start generating leads.
             </p>
-            <button className="bg-blue-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-600 transition-colors flex items-center space-x-2">
+            <button className="w-full bg-blue-500 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-600 transition-colors flex items-center justify-center space-x-2">
               <Play className="w-4 h-4" />
-              <span>Watch Tutorial</span>
+              <span>Watch Tutorial (Coming Soon)</span>
             </button>
           </div>
         </div>
 
-        {/* Status Cards */}
+        {/* Real-time Status Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">API Status</p>
-                <p className="text-2xl font-bold text-green-600">Active</p>
+                <p className={`text-2xl font-bold ${apiKeyConfigured ? 'text-green-600' : 'text-red-600'}`}>
+                  {apiKeyConfigured ? 'Configured' : 'Not Set'}
+                </p>
               </div>
-              <Zap className="w-8 h-8 text-green-600" />
+              <Zap className={`w-8 h-8 ${apiKeyConfigured ? 'text-green-600' : 'text-red-600'}`} />
             </div>
           </div>
           
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Leads Generated</p>
-                <p className="text-2xl font-bold text-ink">0</p>
+                <p className="text-sm font-medium text-gray-600">Today's Usage</p>
+                <p className="text-2xl font-bold text-ink">
+                  {usageStats?.usage.dailyCount || 0} / {usageStats?.usage.dailyLimit || 1000}
+                </p>
               </div>
               <Database className="w-8 h-8 text-ink" />
             </div>
@@ -187,7 +289,9 @@ const Dashboard: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Last Search</p>
-                <p className="text-2xl font-bold text-gray-400">Never</p>
+                <p className="text-2xl font-bold text-gray-400">
+                  {searchResult ? 'Just now' : 'Never'}
+                </p>
               </div>
               <Search className="w-8 h-8 text-gray-400" />
             </div>

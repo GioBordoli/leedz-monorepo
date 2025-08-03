@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import userService, { ApiKeyStatus } from '../../services/userService';
 import { 
   ArrowLeft,
   Key, 
@@ -9,100 +10,178 @@ import {
   Eye,
   EyeOff,
   Save,
-  Trash2,
   AlertTriangle,
   CheckCircle,
-  Loader2
+  Loader2,
+  TestTube
 } from 'lucide-react';
 
 const Settings: React.FC = () => {
-  const { user } = useAuth();
-  const [apiKey, setApiKey] = useState('AIzaSyC...existing_key_placeholder');
+  const { user, token } = useAuth();
+  const [apiKey, setApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [apiKeyStatus, setApiKeyStatus] = useState<ApiKeyStatus | null>(null);
+
+  // Load API key status on component mount
+  useEffect(() => {
+    const loadApiKeyStatus = async () => {
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+      
+      try {
+        setLoading(true);
+        const status = await userService.getApiKeyStatus(token);
+        setApiKeyStatus(status);
+        
+        // Set the preview or empty string
+        if (status.api_key_status.has_key && status.api_key_status.key_preview) {
+          setApiKey(status.api_key_status.key_preview);
+        } else {
+          setApiKey('');
+        }
+        
+        setError(null);
+      } catch (err) {
+        console.error('Failed to load API key status:', err);
+        setError('Failed to load API key status');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadApiKeyStatus();
+  }, [token]);
 
   const handleSaveApiKey = async () => {
+    if (!token || !apiKey.trim()) {
+      setError('Please enter a valid API key');
+      return;
+    }
+
     setIsUpdating(true);
+    setError(null);
+    setSuccess(null);
+    
     try {
-      // TODO: Implement actual API key update
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setIsSaved(true);
-      setTimeout(() => setIsSaved(false), 3000);
+      const result = await userService.saveApiKey(token, apiKey.trim());
+      setSuccess(result.message);
+      
+      // Reload API key status
+      const status = await userService.getApiKeyStatus(token);
+      setApiKeyStatus(status);
+      setApiKey(status.api_key_status.key_preview || '');
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(null), 3000);
     } catch (error) {
-      console.error('Failed to update API key:', error);
+      console.error('Failed to save API key:', error);
+      setError(error instanceof Error ? error.message : 'Failed to save API key');
     } finally {
       setIsUpdating(false);
     }
   };
 
-  const handleDeleteApiKey = async () => {
-    setIsUpdating(true);
+  const handleTestApiKey = async () => {
+    if (!token) return;
+
+    setIsTesting(true);
+    setError(null);
+    setSuccess(null);
+    
     try {
-      // TODO: Implement actual API key deletion
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setApiKey('');
-      setShowDeleteConfirm(false);
+      const result = await userService.testApiKey(token);
+      setSuccess(result.message);
+      
+      // Reload status to get updated validation
+      const status = await userService.getApiKeyStatus(token);
+      setApiKeyStatus(status);
+      
+      setTimeout(() => setSuccess(null), 3000);
     } catch (error) {
-      console.error('Failed to delete API key:', error);
+      console.error('API key test failed:', error);
+      setError(error instanceof Error ? error.message : 'API key test failed');
     } finally {
-      setIsUpdating(false);
+      setIsTesting(false);
     }
   };
+
+  const isApiKeyModified = apiKey !== (apiKeyStatus?.api_key_status.key_preview || '');
+  const hasApiKey = apiKeyStatus?.api_key_status.has_key || false;
+  const isApiKeyValid = apiKeyStatus?.api_key_status.is_valid || false;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex items-center space-x-2">
+          <Loader2 className="w-6 h-6 animate-spin text-mint" />
+          <span className="text-gray-600">Loading settings...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center h-16">
-            <Link 
-              to="/dashboard"
-              className="flex items-center space-x-2 text-gray-600 hover:text-ink transition-colors mr-6"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              <span>Back to Dashboard</span>
-            </Link>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center">
+              <Link to="/dashboard" className="flex items-center space-x-3 text-gray-600 hover:text-ink">
+                <ArrowLeft className="w-5 h-5" />
+                <span>Back to Dashboard</span>
+              </Link>
+            </div>
             <h1 className="text-xl font-semibold text-ink">Settings</h1>
+            <div className="flex items-center space-x-2 text-sm text-gray-600">
+              <User className="w-4 h-4" />
+              <span>{user?.email}</span>
+            </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Sidebar Navigation */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Settings Navigation */}
           <div className="lg:col-span-1">
-            <nav className="space-y-2">
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                <a 
-                  href="#api-keys" 
-                  className="flex items-center space-x-3 px-4 py-3 text-mint bg-mint/5 border-r-2 border-mint font-medium"
-                >
-                  <Key className="w-5 h-5" />
-                  <span>API Keys</span>
-                </a>
-                <a 
-                  href="#account" 
-                  className="flex items-center space-x-3 px-4 py-3 text-gray-600 hover:text-ink hover:bg-gray-50 transition-colors"
-                >
-                  <User className="w-5 h-5" />
-                  <span>Account</span>
-                </a>
-                <a 
-                  href="#security" 
-                  className="flex items-center space-x-3 px-4 py-3 text-gray-600 hover:text-ink hover:bg-gray-50 transition-colors"
-                >
-                  <Shield className="w-5 h-5" />
-                  <span>Security</span>
-                </a>
-              </div>
+            <nav className="space-y-1">
+              <a href="#api-keys" className="bg-mint/10 text-mint border-r-2 border-mint flex items-center px-3 py-2 text-sm font-medium">
+                <Key className="w-4 h-4 mr-3" />
+                API Keys
+              </a>
+              <a href="#security" className="text-gray-600 hover:text-ink hover:bg-gray-50 flex items-center px-3 py-2 text-sm font-medium">
+                <Shield className="w-4 h-4 mr-3" />
+                Security
+              </a>
             </nav>
           </div>
 
           {/* Settings Content */}
           <div className="lg:col-span-3 space-y-8">
+            {/* Error/Success Messages */}
+            {error && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center space-x-2">
+                <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
+                <span className="text-sm text-red-700">{error}</span>
+              </div>
+            )}
+            
+            {success && (
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-center space-x-2">
+                <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+                <span className="text-sm text-green-700">{success}</span>
+              </div>
+            )}
+
             {/* API Keys Section */}
             <section id="api-keys" className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <div className="flex items-center space-x-3 mb-6">
@@ -127,7 +206,7 @@ const Settings: React.FC = () => {
                       value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-mint focus:border-transparent pr-12"
-                      placeholder="Enter your Google Places API key"
+                      placeholder="Enter your Google Places API key (e.g., AIzaSyExample...)"
                     />
                     <button
                       type="button"
@@ -137,122 +216,88 @@ const Settings: React.FC = () => {
                       {showApiKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
                   </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Get your API key from <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="text-mint hover:underline">Google Cloud Console</a>
+                  </p>
                 </div>
 
                 {/* API Key Status */}
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div className="flex items-center space-x-3">
-                    <CheckCircle className="w-5 h-5 text-green-600" />
-                    <div>
-                      <p className="font-medium text-green-900">API Key Active</p>
-                      <p className="text-sm text-green-700">
-                        Your API key is working correctly. Last validated 2 hours ago.
-                      </p>
+                {hasApiKey && (
+                  <div className={`p-4 rounded-lg border ${isApiKeyValid ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                    <div className="flex items-center space-x-3">
+                      {isApiKeyValid ? (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      ) : (
+                        <AlertTriangle className="w-5 h-5 text-yellow-600" />
+                      )}
+                      <div>
+                        <p className={`font-medium ${isApiKeyValid ? 'text-green-900' : 'text-yellow-900'}`}>
+                          {isApiKeyValid ? 'API Key Active' : 'API Key Status Unknown'}
+                        </p>
+                        <p className={`text-sm ${isApiKeyValid ? 'text-green-700' : 'text-yellow-700'}`}>
+                          {isApiKeyValid 
+                            ? 'Your API key is working correctly.'
+                            : 'Click "Test API Key" to verify your key is working.'
+                          }
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 {/* Actions */}
                 <div className="flex items-center space-x-4">
                   <button
                     onClick={handleSaveApiKey}
-                    disabled={isUpdating}
-                    className="bg-mint text-white px-6 py-2 rounded-lg font-medium hover:bg-mint/90 transition-colors disabled:opacity-50 flex items-center space-x-2"
+                    disabled={isUpdating || !isApiKeyModified || !apiKey.trim()}
+                    className="bg-mint text-white px-6 py-2 rounded-lg font-medium hover:bg-mint/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                   >
                     {isUpdating ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : isSaved ? (
-                      <CheckCircle className="w-4 h-4" />
                     ) : (
                       <Save className="w-4 h-4" />
                     )}
-                    <span>{isSaved ? 'Saved!' : 'Save Changes'}</span>
+                    <span>Save Changes</span>
                   </button>
 
-                  <button
-                    onClick={() => setShowDeleteConfirm(true)}
-                    className="bg-red-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-red-700 transition-colors flex items-center space-x-2"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    <span>Delete Key</span>
-                  </button>
+                  {hasApiKey && (
+                    <button
+                      onClick={handleTestApiKey}
+                      disabled={isTesting || isUpdating}
+                      className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                    >
+                      {isTesting ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <TestTube className="w-4 h-4" />
+                      )}
+                      <span>Test API Key (Optional)</span>
+                    </button>
+                  )}
                 </div>
 
-                {/* Delete Confirmation Modal */}
-                {showDeleteConfirm && (
-                  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-6 max-w-md mx-4">
-                      <div className="flex items-center space-x-3 mb-4">
-                        <AlertTriangle className="w-6 h-6 text-red-600" />
-                        <h3 className="text-lg font-semibold text-gray-900">Delete API Key</h3>
-                      </div>
-                      <p className="text-gray-600 mb-6">
-                        Are you sure you want to delete your API key? This will disable lead generation until you add a new key.
-                      </p>
-                      <div className="flex items-center space-x-4">
-                        <button
-                          onClick={handleDeleteApiKey}
-                          disabled={isUpdating}
-                          className="bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 transition-colors flex items-center space-x-2"
-                        >
-                          {isUpdating ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                          <span>Delete</span>
-                        </button>
-                        <button
-                          onClick={() => setShowDeleteConfirm(false)}
-                          className="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg font-medium hover:bg-gray-300 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
+                {/* Test API Key Info */}
+                {hasApiKey && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h3 className="font-medium text-blue-900 mb-2">💡 About API Key Testing</h3>
+                    <p className="text-sm text-blue-800">
+                      The test button validates your API key by making a sample request to Google Places API. 
+                      If the test fails, you can still use your key for lead generation - the test just helps verify 
+                      your key has the right permissions and quotas.
+                    </p>
                   </div>
                 )}
-              </div>
-            </section>
 
-            {/* Account Section */}
-            <section id="account" className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center space-x-3 mb-6">
-                <div className="p-2 bg-slate-custom-500 rounded-lg">
-                  <User className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-semibold text-ink">Account Information</h2>
-                  <p className="text-sm text-gray-600">Manage your account details</p>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email Address
-                  </label>
-                  <input
-                    type="email"
-                    value={user?.email || ''}
-                    disabled
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
-                  />
-                  <p className="text-sm text-gray-500 mt-1">
-                    Email is managed through your Google account
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Account Type
-                  </label>
-                  <div className="flex items-center space-x-2">
-                    <span className="bg-mint text-white px-3 py-1 rounded-full text-sm font-medium">
-                      Free Plan
-                    </span>
-                    <span className="text-gray-600 text-sm">1,000 leads per day</span>
-                  </div>
+                {/* Help Text */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h3 className="font-medium text-blue-900 mb-2">How to get your API key:</h3>
+                  <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+                    <li>Go to <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" className="underline">Google Cloud Console</a></li>
+                    <li>Create a new project or select an existing one</li>
+                    <li>Enable the "Places API" in the API Library</li>
+                    <li>Go to "Credentials" and create an API key</li>
+                    <li>Restrict the key to "Places API" for security</li>
+                  </ol>
                 </div>
               </div>
             </section>

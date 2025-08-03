@@ -32,6 +32,8 @@ export interface UpdateUserData {
   picture?: string;
   places_api_key?: string;
   subscription_status?: 'active' | 'inactive' | 'cancelled';
+  daily_usage_count?: number;
+  usage_reset_date?: Date;
   // 🆕 NEW ONBOARDING UPDATE FIELDS
   has_completed_onboarding?: boolean;
   onboarding_completed_at?: Date;
@@ -330,6 +332,27 @@ export class UserModel {
     } catch (error) {
       console.error('❌ Failed to delete user:', error);
       throw new Error('Failed to delete user');
+    }
+  }
+
+  /**
+   * Get decrypted API key for a user
+   */
+  static async getDecryptedApiKey(id: number): Promise<string | null> {
+    const query = 'SELECT places_api_key FROM users WHERE id = $1';
+    
+    try {
+      const result = await database.query(query, [id]);
+      const user = result.rows[0];
+      
+      if (!user || !user.places_api_key) {
+        return null;
+      }
+      
+      return decrypt(user.places_api_key);
+    } catch (error) {
+      console.error('❌ Failed to get decrypted API key:', error);
+      throw new Error('Failed to get API key');
     }
   }
 } 

@@ -288,7 +288,8 @@ class UserController {
         api_key_status: {
           has_key: hasApiKey,
           key_preview: keyPreview,
-          last_updated: user.updated_at
+          last_updated: user.updated_at,
+          is_valid: hasApiKey // Mark as valid if key exists - testing is optional
         }
       });
 
