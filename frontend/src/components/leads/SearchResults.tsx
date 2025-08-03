@@ -1,6 +1,6 @@
 import React from 'react';
 import { Download, ExternalLink, Phone, Globe, MapPin, Star } from 'lucide-react';
-import { LeadData, SearchResult } from '../../services/leadService';
+import { SearchResult } from '../../services/leadService';
 
 interface SearchResultsProps {
   searchResult: SearchResult | null;
