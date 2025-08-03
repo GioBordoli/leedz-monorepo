@@ -144,4 +144,5 @@ class LeadService {
   }
 }
 
-export default new LeadService(); 
+const leadService = new LeadService();
+export default leadService;
