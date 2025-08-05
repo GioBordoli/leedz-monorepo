@@ -110,6 +110,12 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  const handleClearResults = () => {
+    setSearchResult(null);
+    setError(null);
+    console.log('✅ Search results cleared');
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navigation Header */}
@@ -210,6 +216,7 @@ const Dashboard: React.FC = () => {
             <SearchResults 
               searchResult={searchResult}
               isSearching={isSearching}
+              onClearResults={handleClearResults}
             />
           </div>
         </div>

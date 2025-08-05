@@ -8,6 +8,8 @@ export interface User {
   picture?: string;
   google_oauth_id: string;
   places_api_key?: string; // This will be encrypted in the database
+  google_access_token?: string; // OAuth access token for Sheets API
+  google_refresh_token?: string; // OAuth refresh token for token renewal
   subscription_status: 'active' | 'inactive' | 'cancelled';
   daily_usage_count: number;
   usage_reset_date: Date;
@@ -31,6 +33,8 @@ export interface UpdateUserData {
   name?: string;
   picture?: string;
   places_api_key?: string;
+  google_access_token?: string;
+  google_refresh_token?: string;
   subscription_status?: 'active' | 'inactive' | 'cancelled';
   daily_usage_count?: number;
   usage_reset_date?: Date;
@@ -144,6 +148,27 @@ export class UserModel {
     if (updateData.subscription_status !== undefined) {
       fields.push(`subscription_status = $${paramCount++}`);
       values.push(updateData.subscription_status);
+    }
+
+    if (updateData.daily_usage_count !== undefined) {
+      fields.push(`daily_usage_count = $${paramCount++}`);
+      values.push(updateData.daily_usage_count);
+    }
+
+    if (updateData.usage_reset_date !== undefined) {
+      fields.push(`usage_reset_date = $${paramCount++}`);
+      values.push(updateData.usage_reset_date);
+    }
+
+    // OAuth token fields for Google Sheets integration
+    if (updateData.google_access_token !== undefined) {
+      fields.push(`google_access_token = $${paramCount++}`);
+      values.push(updateData.google_access_token);
+    }
+
+    if (updateData.google_refresh_token !== undefined) {
+      fields.push(`google_refresh_token = $${paramCount++}`);
+      values.push(updateData.google_refresh_token);
     }
 
     // 🆕 NEW ONBOARDING FIELDS
@@ -352,6 +377,21 @@ export class UserModel {
       return decrypt(user.places_api_key);
     } catch (error) {
       console.error('❌ Failed to get decrypted API key:', error);
+      
+      // Check if this is an encryption key mismatch (common in development)
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('decrypt') || errorMessage.includes('authenticate')) {
+        console.warn('🔄 Encryption key mismatch detected - API key needs to be re-entered');
+        // Clear the corrupted API key from database
+        try {
+          await database.query(`UPDATE users SET places_api_key = NULL WHERE id = $1`, [id]);
+          console.info('✅ Corrupted API key cleared - user needs to re-enter it');
+        } catch (clearError) {
+          console.error('❌ Failed to clear corrupted API key:', clearError);
+        }
+        return null; // Return null so user is prompted to re-enter API key
+      }
+      
       throw new Error('Failed to get API key');
     }
   }

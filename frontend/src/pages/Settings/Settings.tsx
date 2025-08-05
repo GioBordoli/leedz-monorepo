@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import userService, { ApiKeyStatus } from '../../services/userService';
+import leadService, { SheetsAuthStatus } from '../../services/leadService';
+import ReAuthenticateModal from '../../components/auth/ReAuthenticateModal';
 import { 
   ArrowLeft,
   Key, 
@@ -13,7 +15,10 @@ import {
   AlertTriangle,
   CheckCircle,
   Loader2,
-  TestTube
+  TestTube,
+  RefreshCw,
+  FileSpreadsheet,
+  XCircle
 } from 'lucide-react';
 
 const Settings: React.FC = () => {
@@ -26,6 +31,12 @@ const Settings: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [apiKeyStatus, setApiKeyStatus] = useState<ApiKeyStatus | null>(null);
+  
+  // Google Sheets authentication state
+  const [sheetsAuthStatus, setSheetsAuthStatus] = useState<SheetsAuthStatus | null>(null);
+  const [isCheckingSheetsAuth, setIsCheckingSheetsAuth] = useState(false);
+  const [showReAuthModal, setShowReAuthModal] = useState(false);
+  const [isReAuthenticating, setIsReAuthenticating] = useState(false);
 
   // Load API key status on component mount
   useEffect(() => {
@@ -58,6 +69,37 @@ const Settings: React.FC = () => {
 
     loadApiKeyStatus();
   }, [token]);
+
+  const checkSheetsAuthentication = useCallback(async () => {
+    if (!token) return;
+    
+    setIsCheckingSheetsAuth(true);
+    try {
+      const authStatus = await leadService.checkSheetsAuthStatus(token);
+      setSheetsAuthStatus(authStatus);
+    } catch (error) {
+      console.error('Failed to check Sheets authentication:', error);
+      setSheetsAuthStatus({
+        success: false,
+        authenticated: false,
+        hasRefreshToken: false,
+        needsReauth: true,
+        message: 'Failed to check authentication status'
+      });
+    } finally {
+      setIsCheckingSheetsAuth(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    checkSheetsAuthentication();
+  }, [checkSheetsAuthentication]);
+
+  const handleReAuthenticate = () => {
+    setIsReAuthenticating(true);
+    // Redirect to Google OAuth flow
+    window.location.href = `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/auth/google`;
+  };
 
   const handleSaveApiKey = async () => {
     if (!token || !apiKey.trim()) {
@@ -344,11 +386,60 @@ const Settings: React.FC = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Google Sheets Connection Status */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <FileSpreadsheet className="w-5 h-5 text-blue-600" />
+                      <div>
+                        <h3 className="font-medium text-blue-900">Google Sheets Connection</h3>
+                        <p className="text-sm text-blue-700">
+                          {isCheckingSheetsAuth ? (
+                            <span className="flex items-center space-x-1">
+                              <RefreshCw className="w-3 h-3 animate-spin" />
+                              <span>Checking...</span>
+                            </span>
+                          ) : sheetsAuthStatus?.authenticated ? (
+                            <span className="flex items-center space-x-1 text-green-600">
+                              <CheckCircle className="w-3 h-3" />
+                              <span>Connected and active</span>
+                            </span>
+                          ) : (
+                            <span className="flex items-center space-x-1 text-red-600">
+                              <XCircle className="w-3 h-3" />
+                              <span>Not connected</span>
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    {!sheetsAuthStatus?.authenticated && (
+                      <button
+                        onClick={() => setShowReAuthModal(true)}
+                        disabled={isCheckingSheetsAuth}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+                      >
+                        Connect Sheets
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             </section>
           </div>
         </div>
       </main>
+
+      {showReAuthModal && (
+        <ReAuthenticateModal
+          isOpen={showReAuthModal}
+          onClose={() => setShowReAuthModal(false)}
+          onReAuthenticate={handleReAuthenticate}
+          isReAuthenticating={isReAuthenticating}
+          feature="Google Sheets export"
+        />
+      )}
     </div>
   );
 };

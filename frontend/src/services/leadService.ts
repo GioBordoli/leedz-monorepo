@@ -4,8 +4,8 @@ const API_URL = 'http://localhost:3001/api';
 export interface LeadData {
   name: string;
   address: string;
-  phone: string;
-  website: string;
+  phone: string | null;
+  website: string | null;
   rating?: number;
   reviewCount?: number;
   placeId: string;
@@ -56,6 +56,39 @@ export interface UsageStats {
     configured: boolean;
     lastUpdated: string;
   };
+}
+
+export interface SheetInfo {
+  id: string;
+  name: string;
+  url: string;
+}
+
+export interface WorksheetInfo {
+  id: number;
+  name: string;
+}
+
+export interface ExportOptions {
+  sheetId?: string;
+  sheetName?: string;
+  worksheetName?: string;
+}
+
+export interface ExportResult {
+  success: boolean;
+  message: string;
+  sheetUrl: string;
+  exportedCount: number;
+  timestamp: string;
+}
+
+export interface SheetsAuthStatus {
+  success: boolean;
+  authenticated: boolean;
+  hasRefreshToken: boolean;
+  needsReauth: boolean;
+  message: string;
 }
 
 class LeadService {
@@ -142,6 +175,141 @@ class LeadService {
       throw error;
     }
   }
+
+  /**
+   * Check Google Sheets authentication status
+   */
+  async checkSheetsAuthStatus(token?: string): Promise<SheetsAuthStatus> {
+    try {
+      const response = await fetch(`${API_URL}/leads/sheets/auth-status`, {
+        method: 'GET',
+        headers: this.getHeaders(token),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || errorData.error || 'Failed to check authentication status');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('❌ Failed to check Sheets auth status:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Export leads to Google Sheets
+   */
+  async exportToSheets(
+    leads: LeadData[], 
+    options: ExportOptions, 
+    businessType: string, 
+    location: string, 
+    token?: string
+  ): Promise<ExportResult> {
+    try {
+      const response = await fetch(`${API_URL}/leads/export-to-sheets`, {
+        method: 'POST',
+        headers: this.getHeaders(token),
+        body: JSON.stringify({
+          leads,
+          ...options,
+          businessType,
+          location
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || errorData.error || 'Export failed');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('❌ Export to sheets failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get user's Google Sheets
+   */
+  async getSheets(token?: string): Promise<{ success: boolean; sheets: SheetInfo[] }> {
+    try {
+      const response = await fetch(`${API_URL}/leads/sheets`, {
+        method: 'GET',
+        headers: this.getHeaders(token),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        
+        // Handle specific authentication errors
+        if (response.status === 403 && errorData.needsReauth) {
+          throw new Error('REAUTH_REQUIRED:' + (errorData.message || 'Re-authentication required'));
+        }
+        
+        if (response.status === 401 && errorData.needsReauth) {
+          throw new Error('REAUTH_REQUIRED:' + (errorData.message || 'Authentication expired'));
+        }
+        
+        throw new Error(errorData.message || errorData.error || 'Failed to get sheets');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('❌ Get sheets failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Validate a specific spreadsheet
+   */
+  async validateSpreadsheet(spreadsheetId: string, token?: string): Promise<{ success: boolean; sheet: SheetInfo }> {
+    try {
+      const response = await fetch(`${API_URL}/leads/sheets/validate`, {
+        method: 'POST',
+        headers: this.getHeaders(token),
+        body: JSON.stringify({ spreadsheetId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || errorData.error || 'Failed to validate spreadsheet');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('❌ Validate spreadsheet failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get worksheets for a specific sheet
+   */
+  async getWorksheets(sheetId: string, token?: string): Promise<{ success: boolean; worksheets: WorksheetInfo[] }> {
+    try {
+      const response = await fetch(`${API_URL}/leads/sheets/${sheetId}/worksheets`, {
+        method: 'GET',
+        headers: this.getHeaders(token),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || errorData.error || 'Failed to get worksheets');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('❌ Failed to get worksheets:', error);
+      throw error;
+    }
+  }
 }
 
-export default new LeadService(); 
+const leadService = new LeadService();
+export { leadService };
+export default leadService; 

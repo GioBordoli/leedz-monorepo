@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import PlacesService, { SearchParams, SearchProgress } from '../services/PlacesService';
 import { UserModel } from '../models/User';
+import { SheetsService, Lead, ExportOptions, ExportResult } from '../services/SheetsService';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -259,6 +260,342 @@ class LeadController {
     } catch (error) {
       console.error('❌ API key test failed:', error);
       res.status(500).json({ error: 'Failed to test API key' });
+    }
+  }
+
+  /**
+   * Export leads to Google Sheets
+   * POST /api/leads/export-to-sheets
+   */
+  async exportToSheets(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      if (!req.user?.id) {
+        res.status(401).json({ error: 'User not authenticated' });
+        return;
+      }
+
+      const { leads, sheetId, sheetName, worksheetName, businessType, location } = req.body;
+
+      // Validate required fields
+      if (!leads || !Array.isArray(leads) || leads.length === 0) {
+        res.status(400).json({ 
+          error: 'Leads data is required',
+          message: 'Please provide an array of leads to export'
+        });
+        return;
+      }
+
+      // Validate lead structure
+      const isValidLead = (lead: any): lead is Lead => {
+        return typeof lead === 'object' && 
+               typeof lead.name === 'string' &&
+               typeof lead.address === 'string' &&
+               (lead.phone === null || typeof lead.phone === 'string') &&
+               (lead.website === null || typeof lead.website === 'string');
+      };
+
+      if (!leads.every(isValidLead)) {
+        res.status(400).json({ 
+          error: 'Invalid lead data format',
+          message: 'Each lead must have name, address, phone, and website fields'
+        });
+        return;
+      }
+
+      // Get user to access OAuth token
+      const user = await UserModel.findById(req.user.id);
+      if (!user) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      // Check if user has Google OAuth token
+      if (!user.google_access_token) {
+        res.status(400).json({ 
+          error: 'Google authentication required',
+          message: 'Please re-authenticate with Google to export to Sheets'
+        });
+        return;
+      }
+
+      // Initialize Sheets service with user's access token
+      const sheetsService = new SheetsService(user.google_access_token);
+
+      // Prepare export options
+      const exportOptions: ExportOptions = {
+        sheetId,
+        sheetName: sheetName || (businessType && location ? 
+          SheetsService.generateDefaultSheetName(businessType, location) : 
+          'Leads Export'),
+        worksheetName
+      };
+
+      console.log(`📊 Exporting ${leads.length} leads to Google Sheets for user ${user.email}`);
+
+      // Export leads to Google Sheets
+      const result: ExportResult = await sheetsService.exportLeads(leads, exportOptions);
+
+      if (result.success) {
+        console.log(`✅ Successfully exported ${leads.length} leads to Google Sheets for ${user.email}`);
+        
+        res.json({
+          success: true,
+          message: result.message,
+          sheetUrl: result.sheetUrl,
+          exportedCount: leads.length,
+          timestamp: new Date().toISOString()
+        });
+      } else {
+        console.error(`❌ Failed to export leads for ${user.email}:`, result.error);
+        
+        res.status(500).json({
+          error: 'Export failed',
+          message: result.message,
+          details: result.error
+        });
+      }
+
+    } catch (error) {
+      console.error('❌ Lead export failed:', error);
+      
+      // Handle specific errors
+      if (error instanceof Error) {
+        if (error.message.includes('access token')) {
+          res.status(401).json({ 
+            error: 'Google authentication expired',
+            message: 'Please re-authenticate with Google to export to Sheets'
+          });
+          return;
+        }
+        
+        if (error.message.includes('permission')) {
+          res.status(403).json({ 
+            error: 'Insufficient permissions',
+            message: 'Please ensure you have granted access to Google Sheets'
+          });
+          return;
+        }
+      }
+
+      res.status(500).json({ 
+        error: 'Export failed',
+        message: 'An error occurred while exporting leads. Please try again.'
+      });
+    }
+  }
+
+  /**
+   * Check Google Sheets authentication status
+   * GET /api/leads/sheets/auth-status
+   */
+  async checkSheetsAuthStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      if (!req.user?.id) {
+        res.status(401).json({ error: 'User not authenticated' });
+        return;
+      }
+
+      const user = await UserModel.findById(req.user.id);
+      if (!user) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      const hasValidToken = !!(user.google_access_token);
+      const hasRefreshToken = !!(user.google_refresh_token);
+
+      // TODO: Add actual token validation by making a test API call
+      // For now, we just check if tokens exist
+      res.json({
+        success: true,
+        authenticated: hasValidToken,
+        hasRefreshToken,
+        needsReauth: !hasValidToken,
+        message: hasValidToken 
+          ? 'Google Sheets authentication is active' 
+          : 'Google Sheets authentication required'
+      });
+
+    } catch (error) {
+      console.error('❌ Failed to check Sheets auth status:', error);
+      res.status(500).json({ 
+        error: 'Failed to check authentication status',
+        message: 'Unable to verify Google Sheets connection'
+      });
+    }
+  }
+
+  /**
+   * Get user's Google Sheets
+   * GET /api/leads/sheets
+   */
+  async getSheets(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      if (!req.user?.id) {
+        res.status(401).json({ error: 'User not authenticated' });
+        return;
+      }
+
+      const user = await UserModel.findById(req.user.id);
+      if (!user) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      if (!user.google_access_token) {
+        res.status(400).json({ 
+          error: 'Google authentication required',
+          message: 'Please authenticate with Google to access your sheets',
+          needsReauth: true
+        });
+        return;
+      }
+
+      const sheetsService = new SheetsService(user.google_access_token);
+      const sheets = await sheetsService.listSpreadsheets();
+
+      res.json({
+        success: true,
+        sheets
+      });
+
+    } catch (error) {
+      console.error('❌ Failed to get user sheets:', error);
+      
+      // Handle specific Google API errors
+      if (error instanceof Error) {
+        if (error.message.includes('insufficient authentication scopes')) {
+          res.status(403).json({ 
+            error: 'Insufficient permissions',
+            message: 'Please re-authenticate to grant access to your Google Sheets',
+            needsReauth: true
+          });
+          return;
+        }
+        
+        if (error.message.includes('invalid_grant') || error.message.includes('Token has been expired')) {
+          res.status(401).json({ 
+            error: 'Authentication expired',
+            message: 'Your Google authentication has expired. Please sign in again.',
+            needsReauth: true
+          });
+          return;
+        }
+      }
+      
+      res.status(500).json({ 
+        error: 'Failed to retrieve sheets',
+        message: 'Unable to access your Google Sheets. Please try again or re-authenticate.'
+      });
+    }
+  }
+
+  /**
+   * Validate a specific spreadsheet by ID or URL
+   * POST /api/leads/sheets/validate
+   */
+  async validateSpreadsheet(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      if (!req.user?.id) {
+        res.status(401).json({ error: 'User not authenticated' });
+        return;
+      }
+
+      const { spreadsheetId, spreadsheetUrl } = req.body;
+      
+      if (!spreadsheetId && !spreadsheetUrl) {
+        res.status(400).json({ 
+          error: 'Missing spreadsheet ID or URL' 
+        });
+        return;
+      }
+
+      const user = await UserModel.findById(req.user.id);
+      if (!user || !user.google_access_token) {
+        res.status(400).json({ 
+          error: 'Google authentication required',
+          needsReauth: true
+        });
+        return;
+      }
+
+      // Extract spreadsheet ID from URL if provided
+      let sheetId = spreadsheetId;
+      if (spreadsheetUrl && !sheetId) {
+        const match = spreadsheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+        if (match) {
+          sheetId = match[1];
+        } else {
+          res.status(400).json({ 
+            error: 'Invalid Google Sheets URL format' 
+          });
+          return;
+        }
+      }
+
+      const sheetsService = new SheetsService(user.google_access_token);
+      const sheetInfo = await sheetsService.validateSpreadsheet(sheetId);
+
+      if (sheetInfo) {
+        res.json({
+          success: true,
+          sheet: sheetInfo
+        });
+      } else {
+        res.status(404).json({
+          success: false,
+          error: 'Spreadsheet not found or access denied'
+        });
+      }
+
+    } catch (error) {
+      console.error('❌ Failed to validate spreadsheet:', error);
+      res.status(500).json({ error: 'Failed to validate spreadsheet' });
+    }
+  }
+
+  /**
+   * Get worksheets for a specific sheet
+   * GET /api/leads/sheets/:sheetId/worksheets
+   */
+  async getWorksheets(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      if (!req.user?.id) {
+        res.status(401).json({ error: 'User not authenticated' });
+        return;
+      }
+
+      const { sheetId } = req.params;
+      if (!sheetId) {
+        res.status(400).json({ error: 'Sheet ID is required' });
+        return;
+      }
+
+      const user = await UserModel.findById(req.user.id);
+      if (!user) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      if (!user.google_access_token) {
+        res.status(400).json({ 
+          error: 'Google authentication required',
+          message: 'Please authenticate with Google to access your sheets'
+        });
+        return;
+      }
+
+      const sheetsService = new SheetsService(user.google_access_token);
+      const worksheets = await sheetsService.getWorksheets(sheetId);
+
+      res.json({
+        success: true,
+        worksheets
+      });
+
+    } catch (error) {
+      console.error('❌ Failed to get worksheets:', error);
+      res.status(500).json({ error: 'Failed to retrieve worksheets' });
     }
   }
 }

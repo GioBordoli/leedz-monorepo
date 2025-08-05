@@ -39,7 +39,8 @@ class AuthController {
       const scopes = [
         'https://www.googleapis.com/auth/userinfo.email',
         'https://www.googleapis.com/auth/userinfo.profile',
-        'https://www.googleapis.com/auth/spreadsheets'
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/drive.readonly'  // ✅ ADD THIS FOR LISTING SHEETS
       ];
 
       const authUrl = this.oauth2Client.generateAuthUrl({
@@ -105,6 +106,15 @@ class AuthController {
       // Ensure user is not null after creation/update
       if (!user) {
         throw new Error('User creation or retrieval failed');
+      }
+
+      // Store OAuth tokens for Google Sheets access
+      if (tokens.access_token || tokens.refresh_token) {
+        await UserModel.update(user.id, {
+          google_access_token: tokens.access_token || undefined,
+          google_refresh_token: tokens.refresh_token || undefined
+        });
+        console.log('✅ OAuth tokens stored for user:', user.email);
       }
 
       // 🆕 ENHANCED JWT TOKEN WITH ONBOARDING STATE
