@@ -12,7 +12,6 @@ interface SearchFormProps {
 const SearchForm: React.FC<SearchFormProps> = ({ onSearch, isSearching, apiKeyConfigured = false }) => {
   const [businessType, setBusinessType] = useState('');
   const [location, setLocation] = useState('');
-  const [maxResults, setMaxResults] = useState(25);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -31,8 +30,7 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch, isSearching, apiKeyCo
     setError(null);
     onSearch({
       businessType,
-      location: location.trim(),
-      maxResults
+      location: location.trim()
     });
   };
 
@@ -40,10 +38,10 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch, isSearching, apiKeyCo
   const canSubmit = isFormValid && apiKeyConfigured && !isSearching;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:shadow-mint/10 transition-all duration-300">
       {/* Header */}
       <div className="flex items-center space-x-3 mb-6">
-        <div className="p-2 bg-mint rounded-lg">
+        <div className="p-2 bg-mint-gradient rounded-xl shadow-lg">
           <Search className="w-6 h-6 text-white" />
         </div>
         <div>
@@ -54,7 +52,7 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch, isSearching, apiKeyCo
 
       {/* Error Message */}
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center space-x-2">
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-center space-x-2">
           <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
           <span className="text-sm text-red-700">{error}</span>
         </div>
@@ -73,7 +71,7 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch, isSearching, apiKeyCo
             value={businessType}
             onChange={(e) => setBusinessType(e.target.value)}
             disabled={isSearching}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-mint focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+            className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-mint focus:border-mint transition-all duration-300 disabled:bg-gray-100 disabled:cursor-not-allowed hover:border-mint/50"
             required
           >
             <option value="">Select a business type...</option>
@@ -102,7 +100,7 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch, isSearching, apiKeyCo
             onChange={(e) => setLocation(e.target.value)}
             placeholder="e.g., San Francisco, CA or 94102"
             disabled={isSearching}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-mint focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+            className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-mint focus:border-mint transition-all duration-300 disabled:bg-gray-100 disabled:cursor-not-allowed hover:border-mint/50"
             required
           />
           <p className="text-xs text-gray-500 mt-1">
@@ -110,32 +108,26 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch, isSearching, apiKeyCo
           </p>
         </div>
 
-        {/* Max Results Selection */}
-        <div>
-          <label htmlFor="maxResults" className="block text-sm font-medium text-gray-700 mb-2">
-            Maximum Results
-          </label>
-          <select
-            id="maxResults"
-            value={maxResults}
-            onChange={(e) => setMaxResults(Number(e.target.value))}
-            disabled={isSearching}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-mint focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-          >
-            <option value={10}>10 leads</option>
-            <option value={25}>25 leads</option>
-            <option value={50}>50 leads</option>
-          </select>
-          <p className="text-xs text-gray-500 mt-1">
-            Higher limits use more of your daily quota
-          </p>
+        {/* Auto Lead Detection Info */}
+        <div className="bg-mint-50 border border-mint-200 rounded-xl p-4">
+          <div className="flex items-start space-x-3">
+            <div className="w-8 h-8 bg-mint-gradient rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+              <Search className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h4 className="font-medium text-ink mb-1">Smart Lead Discovery</h4>
+              <p className="text-sm text-gray-600 mb-2">
+                We'll automatically find all available businesses in your target area using our advanced search technology.
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Submit Button */}
         <button
           type="submit"
           disabled={!canSubmit}
-          className="w-full bg-mint text-white py-3 px-4 rounded-lg font-medium hover:bg-mint/90 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+          className="w-full bg-mint-gradient text-white py-3 px-4 rounded-xl font-medium hover:shadow-lg hover:shadow-mint/25 hover:scale-[1.01] active:scale-[0.99] transition-all duration-300 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none flex items-center justify-center space-x-2"
         >
           {isSearching ? (
             <>
@@ -145,19 +137,11 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch, isSearching, apiKeyCo
           ) : (
             <>
               <Search className="w-4 h-4" />
-              <span>Get Leads</span>
+              <span>Find Leads</span>
             </>
           )}
         </button>
       </form>
-
-      {/* Help Text */}
-      <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-        <p className="text-xs text-gray-600">
-          💡 <strong>Pro tip:</strong> Try searching for specific business types in well-defined areas for the best results. 
-          Each search will find businesses within a 10km radius of your specified location.
-        </p>
-      </div>
     </div>
   );
 };

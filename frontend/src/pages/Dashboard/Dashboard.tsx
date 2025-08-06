@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import SearchForm from '../../components/leads/SearchForm';
 import SearchResults from '../../components/leads/SearchResults';
-import leadService, { SearchParams, SearchResult, UsageStats } from '../../services/leadService';
-import userService from '../../services/userService';
+import leadService, { SearchParams, SearchResult, UsageStats, StreamingCallbacks } from '../../services/leadService';
 import { 
   Search, 
   Settings as SettingsIcon, 
@@ -21,58 +20,29 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [streamingBusinessNames, setStreamingBusinessNames] = useState<string[]>([]);
+  const [searchProgress, setSearchProgress] = useState<{ found: number; total: number } | undefined>();
   const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Load usage stats and API key status on component mount
+  const loadUsageStats = useCallback(async () => {
+    if (!token) return;
+    
+    try {
+      const stats = await leadService.getUsageStats(token);
+      setUsageStats(stats);
+      setApiKeyConfigured(stats.apiKey.configured);
+    } catch (error) {
+      console.error('Failed to load usage stats:', error);
+      // Don't show error for stats loading failure
+    }
+  }, [token]);
+
   useEffect(() => {
-    const loadDashboardData = async () => {
-      if (!token) return; // Wait for token to be available
-      
-      // Load usage stats (non-critical)
-      try {
-        const stats = await leadService.getUsageStats(token);
-        setUsageStats(stats);
-        console.log('🔍 DASHBOARD DEBUG - Usage stats loaded successfully:', stats);
-      } catch (err) {
-        console.warn('⚠️ Usage stats failed to load, but continuing...', err);
-        // Don't fail the whole flow for usage stats
-      }
-      
-      // Load API key status (critical for UI state)
-      try {
-        const apiKeyStatus = await userService.getApiKeyStatus(token);
-        
-        // DEBUG: Log what we received
-        console.log('🔍 DASHBOARD DEBUG - API key status loaded successfully:', apiKeyStatus);
-        console.log('   Extracting has_key:', apiKeyStatus?.api_key_status?.has_key);
-        
-        setApiKeyConfigured(apiKeyStatus.api_key_status.has_key);
-        
-        console.log('🔍 DASHBOARD DEBUG - State updated:');
-        console.log('   apiKeyConfigured set to:', apiKeyStatus.api_key_status.has_key);
-      } catch (err) {
-        console.error('❌ Failed to load API key status:', err);
-        console.log('🔍 DASHBOARD DEBUG - API key status error, setting apiKeyConfigured to false');
-        setApiKeyConfigured(false);
-      }
-    };
-
-    loadDashboardData();
-
-    // Refresh data when window regains focus (e.g., coming back from Settings)
-    const handleWindowFocus = () => {
-      loadDashboardData();
-    };
-
-    window.addEventListener('focus', handleWindowFocus);
-
-    // Cleanup
-    return () => {
-      window.removeEventListener('focus', handleWindowFocus);
-    };
-  }, [token]); // Re-run when token changes
+    loadUsageStats();
+  }, [loadUsageStats]);
 
   const handleLogout = async () => {
     try {
@@ -92,19 +62,56 @@ const Dashboard: React.FC = () => {
     try {
       setIsSearching(true);
       setError(null);
-      console.log('🔍 Starting search:', params);
+      setSearchResult(null);
+      setStreamingBusinessNames([]);
+      setSearchProgress(undefined);
       
-      const result = await leadService.searchLeads(params, token);
-      setSearchResult(result);
+      console.log('🔍 Starting streaming search:', params);
       
-      // Update usage stats after successful search
-      const updatedStats = await leadService.getUsageStats(token);
-      setUsageStats(updatedStats);
+      const callbacks: StreamingCallbacks = {
+        onStart: (businessType, location) => {
+          console.log(`🚀 Search started: ${businessType} in ${location}`);
+        },
+        
+        onBusinessFound: (businessName, found, total) => {
+          console.log(`🏢 Business found: ${found} ${businessName}!`);
+          
+          // Add the business name to our streaming list (keep last 10 for UI performance)
+          setStreamingBusinessNames(prev => {
+            const updated = [...prev, businessName];
+            return updated.slice(-10); // Keep only the last 10 names
+          });
+          
+          // Update progress
+          setSearchProgress({ found, total });
+        },
+        
+        onComplete: (result) => {
+          console.log('✅ Search completed:', result);
+          setSearchResult(result);
+          setStreamingBusinessNames([]);
+          setSearchProgress(undefined);
+          
+          // Update usage stats after successful search
+          loadUsageStats();
+        },
+        
+        onError: (errorMessage) => {
+          console.error('❌ Search failed:', errorMessage);
+          setError(errorMessage);
+          setStreamingBusinessNames([]);
+          setSearchProgress(undefined);
+        }
+      };
+
+      await leadService.searchLeadsStream(params, callbacks, token);
       
     } catch (err) {
       console.error('Search failed:', err);
       const errorMessage = err instanceof Error ? err.message : 'Search failed';
       setError(errorMessage);
+      setStreamingBusinessNames([]);
+      setSearchProgress(undefined);
     } finally {
       setIsSearching(false);
     }
@@ -113,32 +120,52 @@ const Dashboard: React.FC = () => {
   const handleClearResults = () => {
     setSearchResult(null);
     setError(null);
+    setStreamingBusinessNames([]);
+    setSearchProgress(undefined);
     console.log('✅ Search results cleared');
+  };
+
+  // Extract first name from user's full name
+  const getFirstName = (fullName: string): string => {
+    if (!fullName || fullName.trim() === '') {
+      return 'there';
+    }
+    
+    const firstName = fullName.trim().split(' ')[0];
+    return firstName || 'there';
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation Header */}
-      <header className="bg-white border-b border-gray-200">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            {/* Logo */}
-            <div className="flex items-center">
-              <Link to="/" className="text-2xl font-bold text-ink">
-                Leedz
-              </Link>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-mint rounded-lg flex items-center justify-center">
+                  <Search className="w-5 h-5 text-white" />
+                </div>
+                <h1 className="text-xl font-bold text-ink">Leedz</h1>
+              </div>
             </div>
-
-            {/* User Menu */}
+            
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2 text-sm text-gray-600">
+                {user?.picture && (
+                  <img 
+                    src={user.picture} 
+                    alt={user.name || 'User'}
+                    className="w-6 h-6 rounded-full"
+                  />
+                )}
                 <User className="w-4 h-4" />
-                <span>{user?.email}</span>
+                <span>{user?.name || user?.email || 'User'}</span>
               </div>
               
-              <Link 
+              <Link
                 to="/settings"
-                className="p-2 text-gray-600 hover:text-ink transition-colors rounded-lg hover:bg-gray-100"
+                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
                 title="Settings"
               >
                 <SettingsIcon className="w-5 h-5" />
@@ -146,7 +173,7 @@ const Dashboard: React.FC = () => {
               
               <button
                 onClick={handleLogout}
-                className="p-2 text-gray-600 hover:text-red-600 transition-colors rounded-lg hover:bg-gray-100"
+                className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
                 title="Logout"
               >
                 <LogOut className="w-5 h-5" />
@@ -158,150 +185,177 @@ const Dashboard: React.FC = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Section */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-ink mb-2">
-            Welcome back! 👋
+        {/* Welcome Section - Centered */}
+        <div className="text-center mb-12">
+          <div className="flex justify-center items-center space-x-4 mb-6">
+            {user?.picture && (
+              <img 
+                src={user.picture} 
+                alt={user.name || 'User'}
+                className="w-12 h-12 rounded-full border-2 border-mint"
+              />
+            )}
+          </div>
+          <h1 className="text-4xl font-bold text-ink mb-4">
+            Ready for leads, {getFirstName(user?.name || user?.email || '')}? 🎯
           </h1>
-          <p className="text-gray-600">
-            Ready to generate some qualified leads? Let's get started.
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Let's generate some qualified prospects for your business.
           </p>
         </div>
 
         {/* Error Display */}
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center space-x-2">
-            <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
-            <div>
-              <p className="text-sm text-red-700 font-medium">Search Error</p>
-              <p className="text-sm text-red-600">{error}</p>
+          <div className="mb-8 max-w-2xl mx-auto">
+            <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+              <div className="flex items-center space-x-2">
+                <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
+                <div>
+                  <p className="text-red-800 font-medium">Search Failed</p>
+                  <p className="text-red-700 text-sm">{error}</p>
+                </div>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Main Search Interface */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Search Form */}
-          <div className="lg:col-span-1">
-            <SearchForm 
-              onSearch={handleSearch}
-              isSearching={isSearching}
-              apiKeyConfigured={apiKeyConfigured}
-            />
-            
-            {/* API Key Warning */}
-            {!apiKeyConfigured && (
-              <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <div className="flex items-center space-x-2">
-                  <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm text-yellow-700 font-medium">API Key Required</p>
-                    <p className="text-sm text-yellow-600 mb-2">
-                      You need to add your Google Places API key before you can search for leads.
-                    </p>
-                    <Link 
-                      to="/settings"
-                      className="text-sm text-yellow-700 font-medium hover:text-yellow-800 underline"
-                    >
-                      Add API Key in Settings →
-                    </Link>
-                  </div>
+        {/* Centered Search Form */}
+        <div className="max-w-4xl mx-auto mb-12">
+          <SearchForm 
+            onSearch={handleSearch}
+            isSearching={isSearching}
+            apiKeyConfigured={apiKeyConfigured}
+          />
+          
+          {/* API Key Warning */}
+          {!apiKeyConfigured && (
+            <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+              <div className="flex items-center space-x-2">
+                <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+                <div>
+                  <p className="text-sm text-yellow-700 font-medium">API Key Required</p>
+                  <p className="text-sm text-yellow-600 mb-2">
+                    You need to add your Google Places API key before you can search for leads.
+                  </p>
+                  <Link 
+                    to="/settings"
+                    className="text-sm text-yellow-700 font-medium hover:text-yellow-800 underline"
+                  >
+                    Add API Key in Settings →
+                  </Link>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
+        </div>
 
-          {/* Search Results */}
-          <div className="lg:col-span-2">
+        {/* Search Results - Full Width */}
+        {(searchResult || isSearching) && (
+          <div className="mb-12">
             <SearchResults 
               searchResult={searchResult}
               isSearching={isSearching}
+              streamingBusinessNames={streamingBusinessNames}
+              searchProgress={searchProgress}
               onClearResults={handleClearResults}
             />
           </div>
-        </div>
+        )}
 
-        {/* Quick Access */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          {/* Settings Quick Access */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        {/* Bottom Status Cards - 3 Column Layout */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {/* API Configuration Card */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:shadow-mint/10 hover:border-mint/30 transition-all duration-300">
             <div className="flex items-center space-x-3 mb-4">
-              <div className="p-2 bg-mint rounded-lg">
-                <SettingsIcon className="w-6 h-6 text-white" />
+              <div className={`p-2 rounded-lg ${apiKeyConfigured ? 'bg-mint' : 'bg-gray-100'}`}>
+                <Zap className={`w-5 h-5 ${apiKeyConfigured ? 'text-white' : 'text-gray-400'}`} />
               </div>
-              <div>
-                <h3 className="text-lg font-semibold text-ink">Settings & API Key</h3>
-                <p className="text-sm text-gray-600">Manage your API configuration</p>
-              </div>
+              <h3 className="text-lg font-semibold text-ink">API Configuration</h3>
             </div>
+            
+            <div className="mb-4">
+              {apiKeyConfigured ? (
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-mint rounded-full"></div>
+                  <span className="text-mint font-medium">Configured & Ready</span>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                  <span className="text-red-500 font-medium">Not Configured</span>
+                </div>
+              )}
+            </div>
+            
             <p className="text-gray-600 text-sm mb-4">
-              Configure your Google Places API key and manage your account settings.
+              {apiKeyConfigured 
+                ? 'Your API key is working correctly and ready to search.'
+                : 'Add your Google Places API key to start searching for leads.'
+              }
             </p>
-            <Link 
+            
+            <Link
               to="/settings"
-              className="w-full bg-mint text-white py-2 px-4 rounded-lg font-medium hover:bg-mint/90 transition-colors flex items-center justify-center"
+              className="inline-block w-full bg-gray-100 hover:bg-gray-200 text-gray-700 text-center py-2 px-4 rounded-lg font-medium transition-colors"
             >
-              Open Settings
+              Manage Settings
             </Link>
           </div>
 
-          {/* Tutorial Section */}
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-6">
+          {/* Usage Stats Card */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:shadow-mint/10 hover:border-mint/30 transition-all duration-300">
             <div className="flex items-center space-x-3 mb-4">
-              <div className="p-2 bg-blue-500 rounded-lg">
-                <Play className="w-6 h-6 text-white" />
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Database className="w-5 h-5 text-blue-600" />
               </div>
-              <div>
-                <h3 className="text-lg font-semibold text-ink">Getting Started</h3>
-                <p className="text-sm text-gray-600">Learn how to use Leedz</p>
+              <h3 className="text-lg font-semibold text-ink">This Month's Usage</h3>
+            </div>
+            
+            <div className="mb-2">
+              <div className="text-3xl font-bold text-ink">
+                {usageStats?.usage.monthlyCount || 0} / {usageStats?.usage.monthlyLimit || 10000}
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                <div 
+                  className="bg-mint h-2 rounded-full transition-all duration-300" 
+                  style={{ 
+                    width: `${Math.min(100, ((usageStats?.usage.monthlyCount || 0) / (usageStats?.usage.monthlyLimit || 10000)) * 100)}%` 
+                  }}
+                ></div>
               </div>
             </div>
-            <p className="text-gray-600 text-sm mb-4">
-              Watch our tutorial to learn how to get your Google Places API key and start generating leads.
+            
+            <p className="text-sm text-gray-500">
+              Resets: {usageStats?.usage.resetMonth ? 
+                new Date(new Date(usageStats.usage.resetMonth).getFullYear(), new Date(usageStats.usage.resetMonth).getMonth() + 1, 1)
+                  .toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) 
+                : 'Next month'}
             </p>
-            <button className="w-full bg-blue-500 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-600 transition-colors flex items-center justify-center space-x-2">
-              <Play className="w-4 h-4" />
-              <span>Watch Tutorial (Coming Soon)</span>
-            </button>
+            
+            {usageStats && usageStats.usage.monthlyCount > 0 && (
+              <p className="text-sm text-mint mt-2">
+                You're using your quota efficiently. Great job!
+              </p>
+            )}
           </div>
-        </div>
 
-        {/* Real-time Status Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">API Status</p>
-                <p className={`text-2xl font-bold ${apiKeyConfigured ? 'text-green-600' : 'text-red-600'}`}>
-                  {apiKeyConfigured ? 'Configured' : 'Not Set'}
-                </p>
+          {/* Learn & Grow Card */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:shadow-mint/10 hover:border-mint/30 transition-all duration-300">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <Play className="w-5 h-5 text-purple-600" />
               </div>
-              <Zap className={`w-8 h-8 ${apiKeyConfigured ? 'text-green-600' : 'text-red-600'}`} />
+              <h3 className="text-lg font-semibold text-ink">Learn how to use Leedz</h3>
             </div>
-          </div>
-          
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Today's Usage</p>
-                <p className="text-2xl font-bold text-ink">
-                  {usageStats?.usage.dailyCount || 0} / {usageStats?.usage.dailyLimit || 1000}
-                </p>
-              </div>
-              <Database className="w-8 h-8 text-ink" />
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Last Search</p>
-                <p className="text-2xl font-bold text-gray-400">
-                  {searchResult ? 'Just now' : 'Never'}
-                </p>
-              </div>
-              <Search className="w-8 h-8 text-gray-400" />
-            </div>
+            
+            <p className="text-gray-600 text-sm mb-4">
+              Watch our tutorial to learn how to get your Google Places API key and start generating leads effectively.
+            </p>
+            
+            <button className="w-full bg-blue-500 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-600 transition-colors flex items-center justify-center space-x-2 mb-3">
+              <Play className="w-4 h-4" />
+              <span>Watch Tutorial</span>
+            </button>
           </div>
         </div>
       </main>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Download, ExternalLink, Phone, Globe, MapPin, Star, FileSpreadsheet, CheckCircle, XCircle } from 'lucide-react';
+import { Download, ExternalLink, Phone, Globe, MapPin, Star, FileSpreadsheet, CheckCircle, XCircle, Search } from 'lucide-react';
 import { SearchResult, ExportOptions } from '../../services/leadService';
 import leadService from '../../services/leadService';
 import SheetSelector from './SheetSelector';
@@ -9,10 +9,18 @@ import { useAuth } from '../../hooks/useAuth';
 interface SearchResultsProps {
   searchResult: SearchResult | null;
   isSearching: boolean;
+  streamingBusinessNames?: string[];
+  searchProgress?: { found: number; total: number };
   onClearResults?: () => void;
 }
 
-const SearchResults: React.FC<SearchResultsProps> = ({ searchResult, isSearching, onClearResults }) => {
+const SearchResults: React.FC<SearchResultsProps> = ({ 
+  searchResult, 
+  isSearching, 
+  streamingBusinessNames = [],
+  searchProgress,
+  onClearResults 
+}) => {
   const { token } = useAuth();
   const [showSheetSelector, setShowSheetSelector] = useState(false);
   const [showReAuthModal, setShowReAuthModal] = useState(false);
@@ -144,38 +152,79 @@ const SearchResults: React.FC<SearchResultsProps> = ({ searchResult, isSearching
     return phone;
   };
 
+  // Show streaming progress during search
   if (isSearching) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-center py-12">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+        <div className="p-6">
+          <div className="flex items-center justify-center mb-6">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-mint"></div>
+          </div>
+          
+          <div className="text-center mb-6">
+            <h3 className="text-lg font-semibold text-ink mb-2">Searching for leads...</h3>
+            {searchProgress && (
+              <p className="text-sm text-gray-600">
+                Just a moment...
+              </p>
+            )}
+          </div>
+
+          {/* Streaming Business Names */}
+          {streamingBusinessNames.length > 0 && (
+            <div className="mb-4">
+              <h4 className="text-lg font-medium text-ink mb-3">Businesses Found:</h4>
+              <div className="max-h-64 overflow-y-auto space-y-2">
+                {streamingBusinessNames.map((businessName, index) => (
+                  <div 
+                    key={index}
+                    className="flex items-center space-x-2 p-2 bg-mint/5 border border-mint/20 rounded-lg animate-pulse"
+                  >
+                    <div className="w-2 h-2 bg-mint rounded-full animate-ping"></div>
+                    <span className="text-sm text-gray-700 font-medium">{businessName}</span>
+                  </div>
+                ))}
+              </div>
+              
+              {streamingBusinessNames.length > 5 && (
+                <p className="text-xs text-gray-500 mt-2 text-center">
+                  Showing latest businesses found...
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-mint mx-auto mb-4"></div>
-            <h3 className="text-lg font-medium text-ink mb-2">Searching for leads...</h3>
-            <p className="text-gray-600">This may take a few moments</p>
+            <p className="text-sm text-gray-500">
+              This may take a few moments depending on your search criteria...
+            </p>
           </div>
         </div>
       </div>
     );
   }
 
+  // Show message if no search has been performed yet
   if (!searchResult) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="text-center py-12">
-          <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-            <Download className="w-8 h-8 text-gray-400" />
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-lg hover:shadow-mint/10 transition-all duration-300">
+        <div className="p-12 text-center">
+          <div className="w-16 h-16 bg-mint-gradient rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-mint/25">
+            <MapPin className="w-8 h-8 text-white" />
           </div>
-          <h3 className="text-lg font-medium text-ink mb-2">No searches yet</h3>
-          <p className="text-gray-600">Start a search above to see your leads here</p>
+          <h3 className="text-lg font-medium text-ink mb-2">Ready to find leads</h3>
+          <p className="text-gray-600">
+            Enter your search criteria and click "Find Leads" to start discovering businesses.
+          </p>
         </div>
       </div>
     );
   }
 
-  const { results, search, usage } = searchResult;
+  const { results, search } = searchResult;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-lg hover:shadow-mint/10 transition-all duration-300">
       {/* Results Header */}
       <div className="p-6 border-b border-gray-200">
         <div className="flex items-center justify-between mb-4">
@@ -191,17 +240,17 @@ const SearchResults: React.FC<SearchResultsProps> = ({ searchResult, isSearching
               <button
                 onClick={openSheetsExport}
                 disabled={isCheckingAuth || isExporting}
-                className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center space-x-2 px-4 py-2 bg-mint-gradient hover:shadow-lg hover:shadow-mint/25 hover:scale-[1.01] active:scale-[0.99] text-white rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none font-medium"
               >
                 <FileSpreadsheet className="w-4 h-4" />
                 <span>{isCheckingAuth ? 'Checking...' : 'Export to Sheets'}</span>
               </button>
               <button
                 onClick={exportToCSV}
-                className="flex items-center space-x-2 bg-mint text-white px-4 py-2 rounded-lg hover:bg-mint/90 transition-colors"
+                className="flex items-center space-x-2 bg-gray-600 text-white px-4 py-2 rounded-xl hover:bg-gray-700 hover:scale-[1.01] active:scale-[0.99] transition-all duration-300 font-medium"
               >
                 <Download className="w-4 h-4" />
-                <span>Export CSV</span>
+                <span>CSV</span>
               </button>
             </div>
           )}
@@ -209,144 +258,58 @@ const SearchResults: React.FC<SearchResultsProps> = ({ searchResult, isSearching
 
         {/* Search Summary */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-          <div className="bg-gray-50 rounded-lg p-3">
-            <div className="text-gray-600">Business Type</div>
-            <div className="font-medium capitalize">{search.businessType.replace(/_/g, ' ')}</div>
+          <div className="bg-gradient-to-r from-mint/5 to-mint-light/5 border border-mint/20 rounded-xl p-3">
+            <p className="text-gray-600">Business Type</p>
+            <p className="font-medium text-ink capitalize">{search.businessType}</p>
           </div>
-          <div className="bg-gray-50 rounded-lg p-3">
-            <div className="text-gray-600">Location</div>
-            <div className="font-medium">{search.location}</div>
+          <div className="bg-gradient-to-r from-mint/5 to-mint-light/5 border border-mint/20 rounded-xl p-3">
+            <p className="text-gray-600">Location</p>
+            <p className="font-medium text-ink">{search.location}</p>
           </div>
-          <div className="bg-gray-50 rounded-lg p-3">
-            <div className="text-gray-600">Results</div>
-            <div className="font-medium">{results.length} / {search.requested}</div>
-          </div>
-        </div>
-
-        {/* Usage Stats */}
-        <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-blue-700">
-              Daily Usage: <strong>{usage.todayCount}</strong> / {usage.dailyLimit}
-            </span>
-            <span className="text-blue-600">
-              <strong>{usage.remaining}</strong> searches remaining
-            </span>
-          </div>
-          <div className="mt-2 w-full bg-blue-200 rounded-full h-2">
-            <div 
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${(usage.todayCount / usage.dailyLimit) * 100}%` }}
-            ></div>
+          <div className="bg-gradient-to-r from-mint/5 to-mint-light/5 border border-mint/20 rounded-xl p-3">
+            <p className="text-gray-600">API Usage</p>
+            <p className="font-medium text-mint">{results.length} calls used</p>
           </div>
         </div>
       </div>
 
       {/* Results Table */}
       {results.length > 0 ? (
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left p-4 font-medium text-gray-900">Business</th>
-                <th className="text-left p-4 font-medium text-gray-900">Contact</th>
-                <th className="text-left p-4 font-medium text-gray-900">Rating</th>
-                <th className="text-left p-4 font-medium text-gray-900">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {results.map((lead, index) => (
-                <tr key={lead.placeId || index} className="hover:bg-gray-50">
-                  <td className="p-4">
-                    <div>
-                      <div className="font-medium text-ink">{lead.name}</div>
-                      <div className="text-sm text-gray-600 flex items-center mt-1">
-                        <MapPin className="w-3 h-3 mr-1 flex-shrink-0" />
-                        <span className="truncate">{lead.address}</span>
-                      </div>
-                    </div>
-                  </td>
-                  
-                  <td className="p-4">
-                    <div className="space-y-1">
-                      {lead.phone && (
-                        <div className="text-sm flex items-center">
-                          <Phone className="w-3 h-3 mr-1 text-gray-400" />
-                          <a 
-                            href={`tel:${lead.phone}`}
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            {formatPhoneNumber(lead.phone)}
-                          </a>
-                        </div>
-                      )}
-                      {lead.website && (
-                        <div className="text-sm flex items-center">
-                          <Globe className="w-3 h-3 mr-1 text-gray-400" />
-                          <a 
-                            href={lead.website}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-800 truncate max-w-32"
-                          >
-                            Visit Website
-                          </a>
-                        </div>
-                      )}
-                      {!lead.phone && !lead.website && (
-                        <span className="text-sm text-gray-400">No contact info</span>
-                      )}
-                    </div>
-                  </td>
-                  
-                  <td className="p-4">
-                    {lead.rating ? (
-                      <div className="flex items-center space-x-1">
-                        <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                        <span className="text-sm font-medium">{lead.rating}</span>
-                        {lead.reviewCount && (
-                          <span className="text-xs text-gray-500">({lead.reviewCount})</span>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-sm text-gray-400">No rating</span>
-                    )}
-                  </td>
-                  
-                  <td className="p-4">
-                    <div className="flex items-center space-x-2">
-                      {lead.website && (
-                        <a
-                          href={lead.website}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-gray-400 hover:text-mint transition-colors"
-                          title="Visit website"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
-                      )}
-                      {lead.phone && (
-                        <a
-                          href={`tel:${lead.phone}`}
-                          className="text-gray-400 hover:text-mint transition-colors"
-                          title="Call"
-                        >
-                          <Phone className="w-4 h-4" />
-                        </a>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="p-12 text-center">
+          <div className="w-20 h-20 bg-mint-gradient rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-mint/30">
+            <CheckCircle className="w-10 h-10 text-white" />
+          </div>
+          <h3 className="text-2xl font-bold text-ink mb-3">Leads Secured! 🎯</h3>
+          <p className="text-lg text-gray-600 mb-6">
+            Successfully found {results.length} qualified {search.businessType} businesses in {search.location}
+          </p>
+          <div className="flex justify-center space-x-4">
+            <button
+              onClick={openSheetsExport}
+              disabled={isCheckingAuth || isExporting}
+              className="flex items-center space-x-2 px-6 py-3 bg-mint-gradient hover:shadow-lg hover:shadow-mint/25 hover:scale-[1.01] active:scale-[0.99] text-white rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none font-medium"
+            >
+              <FileSpreadsheet className="w-5 h-5" />
+              <span>{isCheckingAuth ? 'Checking...' : 'Export to Sheets'}</span>
+            </button>
+            <button
+              onClick={exportToCSV}
+              className="flex items-center space-x-2 bg-gray-600 text-white px-6 py-3 rounded-xl hover:bg-gray-700 hover:scale-[1.01] active:scale-[0.99] transition-all duration-300 font-medium"
+            >
+              <Download className="w-5 h-5" />
+              <span>Download CSV</span>
+            </button>
+          </div>
         </div>
       ) : (
-        <div className="p-6 text-center">
-          <div className="text-gray-500">
-            No results found for this search. Try adjusting your business type or location.
+        <div className="p-12 text-center">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Search className="w-8 h-8 text-gray-400" />
           </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No results found</h3>
+          <p className="text-gray-600">
+            Try adjusting your search criteria or searching in a different location.
+          </p>
         </div>
       )}
 

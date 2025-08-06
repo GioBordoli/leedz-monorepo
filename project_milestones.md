@@ -628,116 +628,126 @@ class SheetsService {
 
 ---
 
-## 🖥️ Milestone 7: Dashboard & Search Interface (Week 8-9)
-**Goal**: Create the main lead generation dashboard
+## 🚀 Milestone 7: Market-Ready Polish & Essential Fixes (Week 8-9) 🔄 **CURRENT PRIORITY**
+**Goal**: Get core product to market with essential improvements only - NO SCOPE CREEP
+**Duration**: 2-3 weeks | **Status**: Ready to start
 
-### Issue 7.1: Dashboard Layout
-**Priority**: Critical | **Effort**: 8 hours | **Assignee**: Junior Dev
+🎯 **PM ALIGNMENT**: Based on overachievements in Milestones 5-6, focus ONLY on launch-critical items to get to market quickly.
 
-**Description**: Build the main dashboard with search controls and usage stats.
+### Issue 7.1: Business Name Streaming ⚡ **CRITICAL**
+**Priority**: Critical | **Effort**: 8 hours | **Assignee**: Developer
 
-**Acceptance Criteria**:
-- [ ] Create dashboard layout with sidebar navigation
-- [ ] Add usage counter display (247/1000 leads today)
-- [ ] Create search form with business type and city inputs
-- [ ] Add "Start Search" button
-
-**Components**:
-- `Dashboard.tsx` (main page)
-- `UsageCounter.tsx`
-- `SearchForm.tsx`
-- `Sidebar.tsx`
-
-### Issue 7.2: Search Form Implementation
-**Priority**: Critical | **Effort**: 6 hours | **Assignee**: Junior Dev
-
-**Description**: Create the search configuration form.
+**PM Requirement**: "I would like to see the names appearing one by one, it would be pretty cool to see all the businesses names I am about to get phone number of as a user!"
 
 **Acceptance Criteria**:
-- [ ] Business type dropdown with autocomplete
-- [ ] City name input with Google Places autocomplete
-- [ ] Form validation for required fields
-- [ ] Loading states during search
+- [ ] Show business names appearing progressively during search
+- [ ] Simple text-based streaming (not complex terminal UI)
+- [ ] Update search progress: "Found: Business Name 1... Business Name 2..."
+- [ ] Maintain all existing functionality
 
-**Form Fields**:
-```typescript
-interface SearchFormData {
-  businessType: string;
-  cityName: string;
-  radius?: number; // Optional advanced filter
-}
-```
+**Files to Modify**:
+- `backend/src/controllers/LeadController.ts`
+- `frontend/src/components/leads/SearchResults.tsx`
+- `frontend/src/services/leadService.ts`
 
-### Issue 7.3: Usage Tracking Components
-**Priority**: High | **Effort**: 4 hours | **Assignee**: Junior Dev
+### Issue 7.2: User Profile Integration ⚡ **CRITICAL**
+**Priority**: Critical | **Effort**: 3 hours | **Assignee**: Developer
 
-**Description**: Implement daily usage tracking and display.
+**PM Requirement**: "Yes, I want the dashboard to say something like 'Ready for leads, {first name}?'"
 
 **Acceptance Criteria**:
-- [ ] Real-time usage counter
-- [ ] Progress bar showing daily limit
-- [ ] Warning when approaching limit
-- [ ] Reset timer showing when limit resets
+- [ ] Extract first name from Google OAuth user data
+- [ ] Update dashboard header from "Welcome back! 👋" to "Ready for leads, {firstName}?"
+- [ ] Add user profile picture to header (optional enhancement)
+- [ ] Maintain all existing auth functionality
+
+**Files to Modify**:
+- `frontend/src/pages/Dashboard/Dashboard.tsx`
+- `frontend/src/contexts/AuthContext.tsx`
+
+### Issue 7.3: Visual Consistency (Mint Theme) ⚡ **CRITICAL**
+**Priority**: Critical | **Effort**: 6 hours | **Assignee**: Developer
+
+**PM Requirement**: "Yes, this is paramount, the whole platform should be coherent in visuals and UI"
+
+**Acceptance Criteria**:
+- [ ] Apply mint green theme consistently across dashboard
+- [ ] Match landing page's professional design feel
+- [ ] Update buttons, accents, and color scheme to mint green
+- [ ] Maintain current functionality, just improve styling
+
+**Files to Modify**:
+- `frontend/src/pages/Dashboard/Dashboard.tsx`
+- `frontend/src/components/leads/SearchForm.tsx`
+- `frontend/src/components/leads/SearchResults.tsx`
+
+### Issue 7.4: API Limits Correction ⚡ **CRITICAL**
+**Priority**: Critical | **Effort**: 4 hours | **Assignee**: Developer
+
+**PM Requirement**: "The api key limits are for 10'000 api call a month, so that should be the measure we show users, instead of 1000 a day!"
+
+**Acceptance Criteria**:
+- [ ] Update usage tracking from daily (1000/day) to monthly (10,000/month)
+- [ ] Fix both frontend display and backend logic
+- [ ] Update progress bars and usage statistics
+- [ ] Fix usage reset logic to monthly cycle
+
+**Files to Modify**:
+- `backend/src/controllers/LeadController.ts`
+- `backend/src/models/User.ts`
+- `frontend/src/pages/Dashboard/Dashboard.tsx`
+
+### Issue 7.5: Duplicate Prevention ⚡ **CRITICAL**
+**Priority**: Critical | **Effort**: 6 hours | **Assignee**: Developer
+
+**PM Requirement**: "We should think of a strategy to avoid scraping the same leads multiple times if someone calls the search on the same business type on the same city"
+
+**Acceptance Criteria**:
+- [ ] Create simple cache table for searched combinations
+- [ ] Track: user_id + city + business_type + place_id
+- [ ] Skip already-found leads in subsequent searches
+- [ ] Implement cache cleanup (7-day expiry)
+
+**Files to Create/Modify**:
+- `backend/migrations/005_create_search_cache.sql`
+- `backend/src/services/PlacesService.ts`
+- `backend/src/controllers/LeadController.ts`
+
+### Issue 7.6: Custom Lead Count Input ⚡ **CRITICAL**
+**Priority**: Critical | **Effort**: 3 hours | **Assignee**: Developer
+
+**PM Requirement**: "We should allow users to decide how many leads they want to get from a city without setting predefined options like {10-25-50}"
+
+**Acceptance Criteria**:
+- [ ] Replace preset options with number input field
+- [ ] Allow any number (with reasonable max limit)
+- [ ] Show warning: "Results may vary based on city size and population"
+- [ ] Set reasonable bounds (min: 5, max: 100 per search)
+
+**Files to Modify**:
+- `frontend/src/components/leads/SearchForm.tsx`
+- `backend/src/controllers/LeadController.ts`
+
+**🚫 SCOPE DISCIPLINE**: NO additional features beyond these 6 items. Everything else is post-launch.
 
 ---
 
-## 📡 Milestone 8: Real-time Streaming Interface (Week 10)
-**Goal**: Create terminal-style streaming lead display
+## 📡 Milestone 8: Post-Launch Enhancements (FUTURE) 🔮 **DEFERRED**
+**Goal**: Advanced features after successful market launch
+**Status**: ⏸️ **PAUSED - Focus on Milestone 7 launch**
 
-### Issue 8.1: WebSocket Setup
-**Priority**: Critical | **Effort**: 8 hours | **Assignee**: Junior Dev
+🎯 **PM DECISION**: "Everything else is extra in my opinion and should be avoided to stay in scope and budget!"
 
-**Description**: Implement WebSocket server for real-time communication.
+### Future Considerations (Post-Launch Only):
+- Advanced search filters (rating, phone availability)
+- Complex terminal-style streaming interface
+- Search history and saved searches
+- Usage analytics and insights
+- Mobile responsiveness
+- Performance optimizations
+- Enhanced export options
 
-**Acceptance Criteria**:
-- [ ] Set up WebSocket server in backend
-- [ ] Create WebSocket client in frontend
-- [ ] Handle connection management and reconnection
-- [ ] Implement message broadcasting
-
-**Backend**: `backend/src/services/WebSocketServer.js`
-**Frontend**: `frontend/src/services/websocketService.ts`
-
-### Issue 8.2: Terminal Streaming UI
-**Priority**: Critical | **Effort**: 10 hours | **Assignee**: Junior Dev
-
-**Description**: Create terminal-style interface for displaying streaming leads.
-
-**Acceptance Criteria**:
-- [ ] Dark terminal-style container
-- [ ] Auto-scrolling lead display
-- [ ] Green text with monospace font
-- [ ] Real-time lead counter
-- [ ] "Streaming to your sheet..." messages
-
-**Component**: `StreamingTerminal.tsx`
-```tsx
-interface StreamingTerminalProps {
-  isActive: boolean;
-  leads: Lead[];
-  onStop: () => void;
-}
-```
-
-### Issue 8.3: Lead Streaming Logic
-**Priority**: Critical | **Effort**: 8 hours | **Assignee**: Junior Dev
-
-**Description**: Implement the core streaming functionality.
-
-**Acceptance Criteria**:
-- [ ] Search Google Places API in batches
-- [ ] Stream results via WebSocket
-- [ ] Write to Google Sheets simultaneously
-- [ ] Update usage counter in real-time
-- [ ] Handle stop/start controls
-
-**Flow**:
-1. User clicks "Start Search"
-2. Backend begins Places API search
-3. Each found lead triggers WebSocket message
-4. Frontend displays lead in terminal
-5. Backend writes lead to user's sheet
-6. Usage counter increments
+**Note**: These features will be reconsidered ONLY after successful market launch and user feedback.
 
 ---
 

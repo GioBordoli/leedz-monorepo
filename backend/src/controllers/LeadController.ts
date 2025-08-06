@@ -23,6 +23,161 @@ interface AuthenticatedRequest extends Request {
  */
 class LeadController {
   /**
+   * Start a streaming lead generation search with business names appearing one-by-one
+   * POST /api/leads/search-stream
+   */
+  async streamSearch(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      if (!req.user?.id) {
+        res.status(401).json({ error: 'User not authenticated' });
+        return;
+      }
+
+      const { businessType, location } = req.body;
+
+      // Validate required fields
+      if (!businessType || !location) {
+        res.status(400).json({ 
+          error: 'Business type and location are required',
+          example: {
+            businessType: 'restaurant',
+            location: 'San Francisco, CA'
+          }
+        });
+        return;
+      }
+
+      // Get user and check usage limits
+      const user = await UserModel.findById(req.user.id);
+      if (!user) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      // Check if user has API key
+      if (!user.places_api_key) {
+        res.status(400).json({ 
+          error: 'Google Places API key required',
+          message: 'Please add your Google Places API key in Settings before searching for leads'
+        });
+        return;
+      }
+
+      // Check monthly usage limits (10,000 per month)
+      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+      const userResetMonth = user.usage_reset_month?.toISOString().slice(0, 7);
+      
+      if (userResetMonth !== currentMonth) {
+        // Reset monthly count for new month
+        await UserModel.update(user.id, {
+          monthly_usage_count: 0,
+          usage_reset_month: new Date()
+        });
+        user.monthly_usage_count = 0;
+      }
+
+      // Check if user has basic remaining capacity (grid search will use more leads)
+      const estimatedLeads = 300; // Conservative estimate for grid search
+      if (user.monthly_usage_count + estimatedLeads > 10000) {
+        res.status(429).json({ 
+          error: 'Monthly usage limit exceeded',
+          message: `You have ${10000 - user.monthly_usage_count} searches remaining this month`,
+          monthlyLimit: 10000,
+          currentUsage: user.monthly_usage_count
+        });
+        return;
+      }
+
+      // Set up Server-Sent Events
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Headers', 'Cache-Control');
+
+      // Decrypt and use user's API key
+      const decryptedApiKey = await UserModel.getDecryptedApiKey(user.id);
+      if (!decryptedApiKey) {
+        res.write(`data: ${JSON.stringify({type: 'error', message: 'Failed to retrieve API key'})}\n\n`);
+        res.end();
+        return;
+      }
+
+      // Initialize Places service with user's API key
+      const placesService = new PlacesService(decryptedApiKey);
+
+      console.log(`🚀 Starting streaming search for user ${user.email}: ${businessType} in ${location}`);
+
+      // Send initial status
+      res.write(`data: ${JSON.stringify({type: 'start', message: 'Starting search...', businessType, location})}\n\n`);
+
+      // Perform the search with streaming progress
+      const searchParams: SearchParams = {
+        businessType,
+        location,
+        radius: 10000 // 10km radius - reasonable for most searches
+      };
+
+      const results = await placesService.searchBusinessesGrid(searchParams, (progress: SearchProgress) => {
+        // Stream business names as they're found
+        if (progress.currentLocation && !progress.isComplete) {
+          res.write(`data: ${JSON.stringify({
+            type: 'business_found', 
+            name: progress.currentLocation,
+            found: progress.found,
+            total: progress.total
+          })}\n\n`);
+        }
+      }, user.id); // Pass userId for duplicate prevention
+
+      // Update user's daily usage count
+      await UserModel.update(user.id, {
+        monthly_usage_count: user.monthly_usage_count + results.length
+      });
+
+      console.log(`✅ Streaming search completed for ${user.email}: ${results.length} leads found`);
+
+      // Send final results
+      res.write(`data: ${JSON.stringify({
+        type: 'complete',
+        results,
+        search: {
+          businessType,
+          location,
+          requested: results.length, // We get all available leads with grid search
+          found: results.length,
+          timestamp: new Date().toISOString()
+        },
+        usage: {
+          todayCount: user.monthly_usage_count + results.length,
+          dailyLimit: 10000,
+          remaining: 10000 - (user.monthly_usage_count + results.length)
+        }
+      })}\n\n`);
+
+      res.end();
+
+    } catch (error) {
+      console.error('❌ Streaming search failed:', error);
+      
+      // Send error via SSE
+      let errorMessage = 'Search failed';
+      if (error instanceof Error) {
+        if (error.message.includes('API key not valid')) {
+          errorMessage = 'Invalid Google Places API key';
+        } else if (error.message.includes('Location not found')) {
+          errorMessage = 'Location not found';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
+      res.write(`data: ${JSON.stringify({type: 'error', message: errorMessage})}\n\n`);
+      res.end();
+    }
+  }
+
+  /**
    * Start a lead generation search
    * POST /api/leads/search
    */
@@ -48,6 +203,18 @@ class LeadController {
         return;
       }
 
+      // Validate maxResults range (1-250)
+      const requestedResults = Math.max(1, Math.min(250, parseInt(maxResults.toString()) || 25));
+      if (maxResults < 1 || maxResults > 250) {
+        res.status(400).json({ 
+          error: 'Invalid lead count',
+          message: 'Number of leads must be between 1 and 250',
+          provided: maxResults,
+          validRange: { min: 1, max: 250 }
+        });
+        return;
+      }
+
       // Get user and check usage limits
       const user = await UserModel.findById(req.user.id);
       if (!user) {
@@ -64,27 +231,26 @@ class LeadController {
         return;
       }
 
-      // Check daily usage limits (1000 per day)
-      const today = new Date().toISOString().split('T')[0];
-      const userResetDate = user.usage_reset_date?.toISOString().split('T')[0];
+      // Check monthly usage limits (10,000 per month)
+      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+      const userResetMonth = user.usage_reset_month?.toISOString().slice(0, 7);
       
-      if (userResetDate !== today) {
-        // Reset daily count for new day
+      if (userResetMonth !== currentMonth) {
+        // Reset monthly count for new month
         await UserModel.update(user.id, {
-          daily_usage_count: 0,
-          usage_reset_date: new Date()
+          monthly_usage_count: 0,
+          usage_reset_month: new Date()
         });
-        user.daily_usage_count = 0;
+        user.monthly_usage_count = 0;
       }
 
-      // Check if user has exceeded daily limit
-      const requestedResults = Math.min(maxResults, 50); // Cap at 50 per search
-      if (user.daily_usage_count + requestedResults > 1000) {
+      // Check if user has exceeded monthly limit
+      if (user.monthly_usage_count + requestedResults > 10000) {
         res.status(429).json({ 
-          error: 'Daily usage limit exceeded',
-          message: `You have ${1000 - user.daily_usage_count} searches remaining today`,
-          dailyLimit: 1000,
-          currentUsage: user.daily_usage_count
+          error: 'Monthly usage limit exceeded',
+          message: `You have ${10000 - user.monthly_usage_count} searches remaining this month`,
+          monthlyLimit: 10000,
+          currentUsage: user.monthly_usage_count
         });
         return;
       }
@@ -112,11 +278,11 @@ class LeadController {
       const results = await placesService.searchBusinesses(searchParams, (progress: SearchProgress) => {
         // TODO: In future milestone, send progress via WebSocket
         console.log(`📊 Search progress: ${progress.found}/${progress.total} - ${progress.currentLocation || 'Searching...'}`);
-      });
+      }, user.id); // Pass userId for duplicate prevention
 
       // Update user's daily usage count
       await UserModel.update(user.id, {
-        daily_usage_count: user.daily_usage_count + results.length
+        monthly_usage_count: user.monthly_usage_count + results.length
       });
 
       console.log(`✅ Search completed for ${user.email}: ${results.length} leads found`);
@@ -133,9 +299,9 @@ class LeadController {
           timestamp: new Date().toISOString()
         },
         usage: {
-          todayCount: user.daily_usage_count + results.length,
-          dailyLimit: 1000,
-          remaining: 1000 - (user.daily_usage_count + results.length)
+          todayCount: user.monthly_usage_count + results.length,
+          dailyLimit: 10000,
+          remaining: 10000 - (user.monthly_usage_count + results.length)
         }
       });
 
@@ -185,23 +351,26 @@ class LeadController {
         return;
       }
 
-      // Check if usage count needs reset for new day
-      const today = new Date().toISOString().split('T')[0];
-      const userResetDate = user.usage_reset_date?.toISOString().split('T')[0];
+      // Check if usage count needs reset for new month
+      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+      const userResetMonth = user.usage_reset_month?.toISOString().slice(0, 7);
       
-      let currentUsage = user.daily_usage_count;
-      if (userResetDate !== today) {
+      let currentUsage = user.monthly_usage_count || 0;
+      let resetMonth = user.usage_reset_month;
+      
+      if (userResetMonth !== currentMonth) {
         currentUsage = 0;
+        resetMonth = new Date(); // Current month start
       }
 
       res.json({
         success: true,
         usage: {
-          dailyCount: currentUsage,
-          dailyLimit: 1000,
-          remaining: 1000 - currentUsage,
-          resetDate: user.usage_reset_date,
-          percentUsed: Math.round((currentUsage / 1000) * 100)
+          monthlyCount: currentUsage,
+          monthlyLimit: 10000,
+          remaining: 10000 - currentUsage,
+          resetMonth: resetMonth,
+          percentUsed: Math.round((currentUsage / 10000) * 100)
         },
         apiKey: {
           configured: !!user.places_api_key,
@@ -596,6 +765,33 @@ class LeadController {
     } catch (error) {
       console.error('❌ Failed to get worksheets:', error);
       res.status(500).json({ error: 'Failed to retrieve worksheets' });
+    }
+  }
+
+  /**
+   * Clean up expired search cache entries
+   * POST /api/leads/cleanup-cache
+   */
+  async cleanupCache(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      if (!req.user?.id) {
+        res.status(401).json({ error: 'User not authenticated' });
+        return;
+      }
+
+      // Create a temporary PlacesService instance for cleanup
+      const placesService = new PlacesService('dummy-key');
+      const deletedCount = await placesService.cleanupExpiredCache();
+
+      res.json({
+        success: true,
+        message: `Cleaned up ${deletedCount} expired cache entries`,
+        deletedCount
+      });
+
+    } catch (error) {
+      console.error('❌ Failed to cleanup cache:', error);
+      res.status(500).json({ error: 'Failed to cleanup cache' });
     }
   }
 }

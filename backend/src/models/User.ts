@@ -13,6 +13,9 @@ export interface User {
   subscription_status: 'active' | 'inactive' | 'cancelled';
   daily_usage_count: number;
   usage_reset_date: Date;
+  // NEW: Monthly usage tracking (10,000/month limit)
+  monthly_usage_count: number;
+  usage_reset_month: Date;
   // 🆕 NEW ONBOARDING TRACKING FIELDS
   has_completed_onboarding: boolean;
   onboarding_completed_at?: Date;
@@ -38,6 +41,9 @@ export interface UpdateUserData {
   subscription_status?: 'active' | 'inactive' | 'cancelled';
   daily_usage_count?: number;
   usage_reset_date?: Date;
+  // NEW: Monthly usage fields
+  monthly_usage_count?: number;
+  usage_reset_month?: Date;
   // 🆕 NEW ONBOARDING UPDATE FIELDS
   has_completed_onboarding?: boolean;
   onboarding_completed_at?: Date;
@@ -158,6 +164,17 @@ export class UserModel {
     if (updateData.usage_reset_date !== undefined) {
       fields.push(`usage_reset_date = $${paramCount++}`);
       values.push(updateData.usage_reset_date);
+    }
+
+    // NEW: Monthly usage fields
+    if (updateData.monthly_usage_count !== undefined) {
+      fields.push(`monthly_usage_count = $${paramCount++}`);
+      values.push(updateData.monthly_usage_count);
+    }
+
+    if (updateData.usage_reset_month !== undefined) {
+      fields.push(`usage_reset_month = $${paramCount++}`);
+      values.push(updateData.usage_reset_month);
     }
 
     // OAuth token fields for Google Sheets integration
@@ -337,11 +354,79 @@ export class UserModel {
   }
 
   /**
+   * NEW: Get current monthly usage for a user (10,000/month limit)
+   */
+  static async getMonthlyUsage(id: number): Promise<{ count: number; resetMonth: Date; limit: number }> {
+    const query = `
+      SELECT 
+        CASE 
+          WHEN usage_reset_month < DATE_TRUNC('month', CURRENT_DATE) THEN 0
+          ELSE monthly_usage_count
+        END as count,
+        CASE 
+          WHEN usage_reset_month < DATE_TRUNC('month', CURRENT_DATE) THEN DATE_TRUNC('month', CURRENT_DATE)
+          ELSE usage_reset_month
+        END as reset_month
+      FROM users 
+      WHERE id = $1
+    `;
+
+    try {
+      const result = await database.query(query, [id]);
+      const row = result.rows[0];
+      return {
+        count: row.count || 0,
+        resetMonth: row.reset_month,
+        limit: 10000
+      };
+    } catch (error) {
+      console.error('❌ Failed to get monthly usage:', error);
+      throw new Error('Failed to get monthly usage');
+    }
+  }
+
+  /**
+   * NEW: Increment monthly usage count
+   */
+  static async incrementMonthlyUsage(id: number, amount: number = 1): Promise<number> {
+    const query = `
+      UPDATE users 
+      SET monthly_usage_count = CASE 
+        WHEN usage_reset_month < DATE_TRUNC('month', CURRENT_DATE) THEN $2
+        ELSE monthly_usage_count + $2
+      END,
+      usage_reset_month = CASE 
+        WHEN usage_reset_month < DATE_TRUNC('month', CURRENT_DATE) THEN DATE_TRUNC('month', CURRENT_DATE)
+        ELSE usage_reset_month
+      END,
+      updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+      RETURNING monthly_usage_count
+    `;
+
+    try {
+      const result = await database.query(query, [id, amount]);
+      return result.rows[0].monthly_usage_count;
+    } catch (error) {
+      console.error('❌ Failed to increment monthly usage:', error);
+      throw new Error('Failed to increment monthly usage');
+    }
+  }
+
+  /**
    * Check if user has reached daily limit (1000 leads)
    */
   static async hasReachedDailyLimit(id: number): Promise<boolean> {
     const usage = await this.getDailyUsage(id);
     return usage.count >= 1000;
+  }
+
+  /**
+   * NEW: Check if user has reached monthly limit (10,000 leads)
+   */
+  static async hasReachedMonthlyLimit(id: number): Promise<boolean> {
+    const usage = await this.getMonthlyUsage(id);
+    return usage.count >= 10000;
   }
 
   /**

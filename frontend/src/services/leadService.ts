@@ -23,7 +23,6 @@ export interface BusinessCategories {
 export interface SearchParams {
   businessType: string;
   location: string;
-  maxResults?: number;
 }
 
 export interface SearchResult {
@@ -37,19 +36,26 @@ export interface SearchResult {
     timestamp: string;
   };
   usage: {
-    todayCount: number;
-    dailyLimit: number;
+    monthlyCount: number;
+    monthlyLimit: number;
     remaining: number;
   };
+}
+
+export interface StreamingCallbacks {
+  onBusinessFound?: (businessName: string, found: number, total: number) => void;
+  onComplete?: (result: SearchResult) => void;
+  onError?: (error: string) => void;
+  onStart?: (businessType: string, location: string) => void;
 }
 
 export interface UsageStats {
   success: boolean;
   usage: {
-    dailyCount: number;
-    dailyLimit: number;
+    monthlyCount: number;
+    monthlyLimit: number;
     remaining: number;
-    resetDate: string;
+    resetMonth: string;
     percentUsed: number;
   };
   apiKey: {
@@ -107,6 +113,99 @@ class LeadService {
     }
 
     return headers;
+  }
+
+  /**
+   * Start a streaming lead generation search with real-time business name updates
+   */
+  async searchLeadsStream(
+    params: SearchParams, 
+    callbacks: StreamingCallbacks,
+    token?: string
+  ): Promise<void> {
+    if (!token) {
+      throw new Error('Authorization token required');
+    }
+
+    return new Promise((resolve, reject) => {
+      // Handle this by making a fetch request that we manually handle as a stream
+      fetch(`${API_URL}/leads/search-stream`, {
+        method: 'POST',
+        headers: this.getHeaders(token),
+        body: JSON.stringify(params),
+      }).then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+
+        if (!reader) {
+          throw new Error('No response body reader available');
+        }
+
+        const processStream = async () => {
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              
+              if (done) {
+                resolve();
+                break;
+              }
+
+              const chunk = decoder.decode(value, { stream: true });
+              const lines = chunk.split('\n');
+
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  try {
+                    const data = JSON.parse(line.slice(6));
+                    
+                    switch (data.type) {
+                      case 'start':
+                        callbacks.onStart?.(data.businessType, data.location);
+                        break;
+                      
+                      case 'business_found':
+                        callbacks.onBusinessFound?.(data.name, data.found, data.total);
+                        break;
+                      
+                      case 'complete':
+                        const result: SearchResult = {
+                          success: true,
+                          results: data.results,
+                          search: data.search,
+                          usage: data.usage
+                        };
+                        callbacks.onComplete?.(result);
+                        resolve();
+                        return;
+                      
+                      case 'error':
+                        callbacks.onError?.(data.message);
+                        reject(new Error(data.message));
+                        return;
+                    }
+                  } catch (parseError) {
+                    console.warn('Failed to parse SSE data:', line);
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            callbacks.onError?.(error instanceof Error ? error.message : 'Stream processing failed');
+            reject(error);
+          }
+        };
+
+        processStream();
+      }).catch(error => {
+        callbacks.onError?.(error.message || 'Failed to start streaming search');
+        reject(error);
+      });
+    });
   }
 
   /**
