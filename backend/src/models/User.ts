@@ -23,6 +23,10 @@ export interface User {
   last_login_at: Date;
   created_at: Date;
   updated_at: Date;
+  // 🆕 STRIPE INTEGRATION FIELDS
+  stripe_customer_id?: string;
+  stripe_subscription_id?: string;
+  subscription_plan: string;
 }
 
 export interface CreateUserData {
@@ -48,6 +52,10 @@ export interface UpdateUserData {
   has_completed_onboarding?: boolean;
   onboarding_completed_at?: Date;
   last_login_at?: Date;
+  // 🆕 STRIPE UPDATE FIELDS
+  stripe_customer_id?: string;
+  stripe_subscription_id?: string;
+  subscription_plan?: string;
 }
 
 export class UserModel {
@@ -202,6 +210,22 @@ export class UserModel {
     if (updateData.last_login_at !== undefined) {
       fields.push(`last_login_at = $${paramCount++}`);
       values.push(updateData.last_login_at);
+    }
+
+    // 🆕 STRIPE FIELDS
+    if (updateData.stripe_customer_id !== undefined) {
+      fields.push(`stripe_customer_id = $${paramCount++}`);
+      values.push(updateData.stripe_customer_id);
+    }
+
+    if (updateData.stripe_subscription_id !== undefined) {
+      fields.push(`stripe_subscription_id = $${paramCount++}`);
+      values.push(updateData.stripe_subscription_id);
+    }
+
+    if (updateData.subscription_plan !== undefined) {
+      fields.push(`subscription_plan = $${paramCount++}`);
+      values.push(updateData.subscription_plan);
     }
 
     if (fields.length === 0) {
@@ -443,6 +467,56 @@ export class UserModel {
       console.error('❌ Failed to delete user:', error);
       throw new Error('Failed to delete user');
     }
+  }
+
+  /**
+   * 🆕 STRIPE METHODS
+   */
+
+  /**
+   * Find user by Stripe customer ID
+   */
+  static async findByStripeCustomerId(customerId: string): Promise<User | null> {
+    const query = 'SELECT * FROM users WHERE stripe_customer_id = $1';
+    
+    try {
+      const result = await database.query(query, [customerId]);
+      return result.rows[0] || null;
+    } catch (error) {
+      console.error('❌ Failed to find user by Stripe customer ID:', error);
+      throw new Error('Failed to find user by Stripe customer ID');
+    }
+  }
+
+  /**
+   * Update user's Stripe customer ID
+   */
+  static async updateStripeCustomerId(id: number, customerId: string): Promise<User | null> {
+    return this.update(id, { stripe_customer_id: customerId });
+  }
+
+  /**
+   * Update user's subscription status and Stripe subscription ID
+   */
+  static async updateSubscription(
+    id: number, 
+    subscriptionId: string, 
+    status: 'active' | 'inactive' | 'cancelled',
+    plan: string = 'basic'
+  ): Promise<User | null> {
+    return this.update(id, { 
+      stripe_subscription_id: subscriptionId,
+      subscription_status: status,
+      subscription_plan: plan
+    });
+  }
+
+  /**
+   * Check if user has active subscription
+   */
+  static async hasActiveSubscription(id: number): Promise<boolean> {
+    const user = await this.findById(id);
+    return user ? user.subscription_status === 'active' : false;
   }
 
   /**

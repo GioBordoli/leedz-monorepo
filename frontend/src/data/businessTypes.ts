@@ -75,8 +75,9 @@ export const BUSINESS_TYPES: BusinessCategories = {
     { value: "bowling_alley", label: "Bowling Alley" },
     { value: "casino", label: "Casino" }
   ],
-  "Lodging": [
-    { value: "lodging", label: "Lodging" },
+  "Lodging & Hospitality": [
+    { value: "lodging", label: "Hotels, Motels & B&Bs" },
+    { value: "tourist_attraction", label: "Tourist Attraction" },
     { value: "rv_park", label: "RV Park" },
     { value: "campground", label: "Campground" }
   ],
@@ -86,6 +87,16 @@ export const BUSINESS_TYPES: BusinessCategories = {
     { value: "airport", label: "Airport" },
     { value: "bus_station", label: "Bus Station" },
     { value: "train_station", label: "Train Station" }
+  ],
+  "Technology & IT": [
+    { value: "electronics_store", label: "Electronics Store" },
+    { value: "store", label: "Computer/Phone Repair" }
+  ],
+  "Personal Care": [
+    { value: "laundry", label: "Laundromat" },
+    { value: "florist", label: "Florist" },
+    { value: "pet_store", label: "Pet Store" },
+    { value: "funeral_home", label: "Funeral Home" }
   ]
 };
 

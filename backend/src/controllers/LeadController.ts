@@ -54,6 +54,16 @@ class LeadController {
         return;
       }
 
+      // Check subscription status
+      if (user.subscription_status !== 'active') {
+        res.status(403).json({ 
+          error: 'Subscription required',
+          message: 'An active subscription is required to search for leads',
+          subscriptionStatus: user.subscription_status
+        });
+        return;
+      }
+
       // Check if user has API key
       if (!user.places_api_key) {
         res.status(400).json({ 
@@ -219,6 +229,16 @@ class LeadController {
       const user = await UserModel.findById(req.user.id);
       if (!user) {
         res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      // Check subscription status
+      if (user.subscription_status !== 'active') {
+        res.status(403).json({ 
+          error: 'Subscription required',
+          message: 'An active subscription is required to search for leads',
+          subscriptionStatus: user.subscription_status
+        });
         return;
       }
 

@@ -10,6 +10,8 @@ import PrivacyPolicy from './pages/Legal/PrivacyPolicy';
 import TermsOfService from './pages/Legal/TermsOfService';
 import AuthSuccess from './pages/Auth/AuthSuccess';
 import AuthError from './pages/Auth/AuthError';
+import BillingSuccess from './pages/Billing/BillingSuccess';
+import BillingCancel from './pages/Billing/BillingCancel';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import OnboardingPrompt from './components/OnboardingPrompt'; // 🆕 NEW IMPORT
 import './App.css';
@@ -58,6 +60,19 @@ const AuthenticatedApp: React.FC = () => {
       <Route path="/settings" element={
         <ProtectedRoute>
           <Settings />
+        </ProtectedRoute>
+      } />
+      
+      {/* Billing routes */}
+      <Route path="/billing/success" element={
+        <ProtectedRoute>
+          <BillingSuccess />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/billing/cancel" element={
+        <ProtectedRoute>
+          <BillingCancel />
         </ProtectedRoute>
       } />
       
