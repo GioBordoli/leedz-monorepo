@@ -1,7 +1,8 @@
-import { loadStripe } from '@stripe/stripe-js';
-
-// Initialize Stripe
-const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY || '');
+// Stripe Payment Links (no Stripe SDK needed)
+const STRIPE_PAYMENT_LINKS = {
+  monthly: 'https://buy.stripe.com/cNi5kE84of4lb0Xc4Qdby00',
+  yearly: 'https://buy.stripe.com/aFa3cwdoI09r5GD5Gsdby01'
+};
 
 export interface BillingStatus {
   hasSubscription: boolean;
@@ -50,27 +51,17 @@ class BillingService {
   }
 
   /**
-   * Create a Stripe Checkout session
+   * Redirect to Stripe Payment Link (Monthly)
    */
-  async createCheckoutSession(): Promise<CheckoutSession> {
-    const token = localStorage.getItem('authToken');
-    if (!token) {
-      throw new Error('No authentication token found');
-    }
+  async redirectToMonthlyCheckout(): Promise<void> {
+    window.location.href = STRIPE_PAYMENT_LINKS.monthly;
+  }
 
-    const response = await fetch(`${this.baseUrl}/api/billing/create-checkout-session`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to create checkout session');
-    }
-
-    return response.json();
+  /**
+   * Redirect to Stripe Payment Link (Yearly)
+   */
+  async redirectToYearlyCheckout(): Promise<void> {
+    window.location.href = STRIPE_PAYMENT_LINKS.yearly;
   }
 
   /**
@@ -98,15 +89,13 @@ class BillingService {
   }
 
   /**
-   * Redirect to Stripe Checkout
+   * Redirect to Stripe Checkout (defaults to monthly)
    */
-  async redirectToCheckout(): Promise<void> {
-    try {
-      const { url } = await this.createCheckoutSession();
-      window.location.href = url;
-    } catch (error) {
-      console.error('Error redirecting to checkout:', error);
-      throw error;
+  async redirectToCheckout(plan: 'monthly' | 'yearly' = 'monthly'): Promise<void> {
+    if (plan === 'yearly') {
+      await this.redirectToYearlyCheckout();
+    } else {
+      await this.redirectToMonthlyCheckout();
     }
   }
 
