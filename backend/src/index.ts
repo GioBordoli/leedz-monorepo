@@ -15,6 +15,11 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true
 }));
+
+// Special handling for Stripe webhooks (needs raw body)
+app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
+
+// Regular JSON parsing for other routes
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -26,6 +31,8 @@ app.get('/health', (_req, res) => {
 // Import routes
 import authRoutes from './routes/authRoutes';
 import userRoutes from './routes/userRoutes';
+import leadRoutes from './routes/leadRoutes';
+import billingRoutes from './routes/billingRoutes';
 
 // API routes
 app.get('/api', (_req, res) => {
@@ -37,6 +44,12 @@ app.use('/auth', authRoutes);
 
 // User management routes (protected)
 app.use('/api/user', userRoutes);
+
+// Lead generation routes (protected)
+app.use('/api/leads', leadRoutes);
+
+// Billing routes (Stripe integration)
+app.use('/api/billing', billingRoutes);
 
 // Error handling middleware
 // FIXME: SECURITY - Error handler may leak sensitive information in stack traces

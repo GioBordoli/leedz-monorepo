@@ -1,17 +1,22 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { google } from 'googleapis';
+import { UserModel, User } from '../models/User'; // Fix import path and import both UserModel class and User interface
 
-interface User {
-  id: string;
+interface AuthenticatedRequest extends Request {
+  user?: User;
+}
+
+// 🆕 Interface for JWT payload with additional auth fields
+interface JWTPayload {
+  id: number;
   email: string;
   name: string;
   picture?: string;
   googleId: string;
-}
-
-interface AuthenticatedRequest extends Request {
-  user?: User;
+  hasCompletedOnboarding?: boolean;
+  isFirstLogin?: boolean;
+  needsOnboarding?: boolean;
 }
 
 class AuthController {
@@ -34,7 +39,8 @@ class AuthController {
       const scopes = [
         'https://www.googleapis.com/auth/userinfo.email',
         'https://www.googleapis.com/auth/userinfo.profile',
-        'https://www.googleapis.com/auth/spreadsheets'
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/drive.readonly'  // ✅ ADD THIS FOR LISTING SHEETS
       ];
 
       const authUrl = this.oauth2Client.generateAuthUrl({
@@ -76,17 +82,53 @@ class AuthController {
         return;
       }
 
-      // Create user object
-      const user: User = {
-        id: userInfo.data.id || '',
-        email: userInfo.data.email,
-        name: userInfo.data.name || '',
-        picture: userInfo.data.picture || undefined,
-        googleId: userInfo.data.id || ''
-      };
+      // 🆕 ENHANCED USER CREATION/UPDATE LOGIC
+      let user = await UserModel.findByGoogleId(userInfo.data.id || '');
+      const isFirstLogin = !user;
 
-      // Generate JWT token
-      const jwtToken = this.generateJWT(user);
+      if (isFirstLogin) {
+        // Create new user
+        user = await UserModel.create({
+          email: userInfo.data.email,
+          name: userInfo.data.name || '',
+          picture: userInfo.data.picture || undefined,
+          google_oauth_id: userInfo.data.id || ''
+        });
+        console.log('✅ New user created:', userInfo.data.email);
+      } else {
+        // Update existing user's last login
+        if (user) {
+          await UserModel.updateLastLogin(user.id);
+          console.log('✅ Returning user login updated:', userInfo.data.email);
+        }
+      }
+
+      // Ensure user is not null after creation/update
+      if (!user) {
+        throw new Error('User creation or retrieval failed');
+      }
+
+      // Store OAuth tokens for Google Sheets access
+      if (tokens.access_token || tokens.refresh_token) {
+        await UserModel.update(user.id, {
+          google_access_token: tokens.access_token || undefined,
+          google_refresh_token: tokens.refresh_token || undefined
+        });
+        console.log('✅ OAuth tokens stored for user:', user.email);
+      }
+
+      // 🆕 ENHANCED JWT TOKEN WITH ONBOARDING STATE
+      const jwtToken = this.generateJWT({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        picture: user.picture,
+        googleId: user.google_oauth_id,
+        // 🆕 Include onboarding status in token
+        hasCompletedOnboarding: user.has_completed_onboarding,
+        isFirstLogin,
+        needsOnboarding: !user.has_completed_onboarding
+      });
 
       // FIXME: CRITICAL - Store refresh token in database for session management
       // TODO: Implement refresh token rotation for security
@@ -106,13 +148,16 @@ class AuthController {
   /**
    * Generate JWT token for user
    */
-  generateJWT = (user: User): string => {
-    const payload = {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      picture: user.picture,
-      googleId: user.googleId
+  generateJWT = (payload: JWTPayload): string => {
+    const jwtPayload = {
+      id: payload.id,
+      email: payload.email,
+      name: payload.name,
+      picture: payload.picture,
+      googleId: payload.googleId,
+      hasCompletedOnboarding: payload.hasCompletedOnboarding,
+      isFirstLogin: payload.isFirstLogin,
+      needsOnboarding: payload.needsOnboarding
     };
 
     const secret = process.env.JWT_SECRET;
@@ -122,8 +167,7 @@ class AuthController {
 
     const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
 
-    // FIXME: Remove type assertion and fix JWT typing issue properly
-    return jwt.sign(payload, secret, { expiresIn } as any);
+    return jwt.sign(jwtPayload, secret, { expiresIn } as jwt.SignOptions);
   };
 
   /**
@@ -140,7 +184,16 @@ class AuthController {
       }
 
       // Generate new JWT token
-      const newToken = this.generateJWT(user);
+      const newToken = this.generateJWT({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        picture: user.picture,
+        googleId: user.google_oauth_id,
+        hasCompletedOnboarding: user.has_completed_onboarding,
+        isFirstLogin: false, // This will be handled by the frontend
+        needsOnboarding: !user.has_completed_onboarding
+      });
 
       res.json({
         success: true,

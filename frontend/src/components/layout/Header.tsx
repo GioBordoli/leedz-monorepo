@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, LogIn, UserPlus } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
+import authService from '../../services/authService';
 import Button from '../common/Button';
 
 const Header: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -20,75 +23,94 @@ const Header: React.FC = () => {
     const element = document.getElementById(sectionId);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' });
-      setIsMobileMenuOpen(false);
     }
+    setIsMobileMenuOpen(false);
+  };
+
+  const handleSignUp = () => {
+    authService.login();
+  };
+
+  const handleLogIn = () => {
+    authService.login();
   };
 
   const navItems = [
-    { label: 'Features', href: '#features' },
-    { label: 'How it works', href: '#how-it-works' },
-    { label: 'Pricing', href: '#pricing' },
-    { label: 'FAQ', href: '#faq' },
+    { name: 'Features', id: 'features' },
+    { name: 'How it works', id: 'how-it-works' },
+    { name: 'Pricing', id: 'pricing' },
+    { name: 'FAQ', id: 'faq' },
   ];
 
   return (
     <motion.header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         isScrolled 
-          ? 'bg-white/95 backdrop-blur-md shadow-lg border-b border-border-light' 
+          ? 'bg-white/95 backdrop-blur-md shadow-sm border-b border-border-light' 
           : 'bg-transparent'
       }`}
       initial={{ y: -100 }}
       animate={{ y: 0 }}
-      transition={{ duration: 0.6 }}
+      transition={{ duration: 0.6, ease: "easeOut" }}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 lg:h-20">
+        <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <motion.div
             className="flex items-center"
             whileHover={{ scale: 1.05 }}
             transition={{ duration: 0.2 }}
           >
-            <h1 className="text-2xl lg:text-3xl font-display font-bold text-text-dark">
+            <span className="text-2xl font-display font-bold text-ink">
               Leedz
-            </h1>
+            </span>
           </motion.div>
 
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center space-x-8">
             {navItems.map((item) => (
-              <motion.button
-                key={item.label}
-                onClick={() => scrollToSection(item.href.slice(1))}
-                className="text-gray-700 hover:text-mint font-medium transition-colors duration-200"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+              <button
+                key={item.name}
+                onClick={() => scrollToSection(item.id)}
+                className="text-gray-600 hover:text-ink transition-colors font-medium"
               >
-                {item.label}
-              </motion.button>
+                {item.name}
+              </button>
             ))}
           </nav>
 
           {/* Desktop CTAs */}
-          <div className="hidden lg:flex items-center space-x-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => scrollToSection('demo')}
-            >
-              Watch demo
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => {
-                const element = document.getElementById('pricing');
-                element?.scrollIntoView({ behavior: 'smooth' });
-              }}
-            >
-              Start now
-            </Button>
+          <div className="hidden lg:flex items-center space-x-3">
+            {!isAuthenticated ? (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleLogIn}
+                  className="flex items-center space-x-2"
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span>Log in</span>
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleSignUp}
+                  className="flex items-center space-x-2"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>Sign up</span>
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => window.location.href = '/dashboard'}
+              >
+                Dashboard
+              </Button>
+            )}
           </div>
 
           {/* Mobile menu button */}
@@ -118,33 +140,46 @@ const Header: React.FC = () => {
           <div className="py-4 space-y-4 border-t border-border-light bg-white/95 backdrop-blur-md">
             {navItems.map((item) => (
               <button
-                key={item.label}
-                onClick={() => scrollToSection(item.href.slice(1))}
-                className="block w-full text-left px-4 py-2 text-gray-700 hover:text-mint hover:bg-mint/5 transition-colors duration-200"
+                key={item.name}
+                onClick={() => scrollToSection(item.id)}
+                className="block w-full text-left px-4 py-2 text-gray-600 hover:text-ink hover:bg-gray-50 transition-colors font-medium"
               >
-                {item.label}
+                {item.name}
               </button>
             ))}
-            <div className="flex flex-col space-y-2 px-4 pt-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => scrollToSection('demo')}
-                className="w-full"
-              >
-                Watch demo
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => {
-                  const element = document.getElementById('pricing');
-                  element?.scrollIntoView({ behavior: 'smooth' });
-                }}
-                className="w-full"
-              >
-                Start now
-              </Button>
+            
+            <div className="px-4 pt-4 space-y-3 border-t border-gray-200">
+              {!isAuthenticated ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleLogIn}
+                    className="w-full flex items-center justify-center space-x-2"
+                  >
+                    <LogIn className="w-4 h-4" />
+                    <span>Log in</span>
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleSignUp}
+                    className="w-full flex items-center justify-center space-x-2"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    <span>Sign up</span>
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => window.location.href = '/dashboard'}
+                  className="w-full"
+                >
+                  Dashboard
+                </Button>
+              )}
             </div>
           </div>
         </motion.div>

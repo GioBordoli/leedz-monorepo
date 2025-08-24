@@ -24,14 +24,14 @@ router.use(sanitizeInput);
 
 // Get user profile
 // GET /api/user/profile
-router.get('/profile', userController.getProfile);
+router.get('/profile', userController.getProfile.bind(userController));
 
 // Update user profile
 // PUT /api/user/profile
 router.put('/profile', 
   validateRateLimit(60000, 10), // 10 requests per minute for profile updates
   validateProfileUpdate,
-  userController.updateProfile
+  userController.updateProfile.bind(userController)
 );
 
 /**
@@ -43,12 +43,12 @@ router.put('/profile',
 router.post('/api-key',
   validateRateLimit(300000, 5), // 5 requests per 5 minutes for API key updates
   validateApiKey,
-  userController.setApiKey
+  userController.setApiKey.bind(userController)
 );
 
 // Get API key status (without exposing actual key)
 // GET /api/user/api-key/status
-router.get('/api-key/status', userController.getApiKeyStatus);
+router.get('/api-key/status', userController.getApiKeyStatus.bind(userController));
 
 /**
  * Usage Statistics Routes
@@ -56,7 +56,7 @@ router.get('/api-key/status', userController.getApiKeyStatus);
 
 // Get daily usage statistics
 // GET /api/user/usage
-router.get('/usage', userController.getUsageStats);
+router.get('/usage', userController.getUsageStats.bind(userController));
 
 /**
  * Account Management Routes
@@ -67,8 +67,11 @@ router.get('/usage', userController.getUsageStats);
 router.delete('/account',
   validateRateLimit(86400000, 3), // 3 requests per day for account deletion attempts
   validateAccountDeletion,
-  userController.deleteAccount
+  userController.deleteAccount.bind(userController)
 );
+
+// POST /api/user/complete-onboarding - Mark onboarding as completed
+router.post('/complete-onboarding', authenticateJWT, userController.completeOnboarding.bind(userController));
 
 // TODO: Add routes for sheet configuration management
 // TODO: Add billing/subscription management routes

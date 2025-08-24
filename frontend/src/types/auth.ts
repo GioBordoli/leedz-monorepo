@@ -3,6 +3,11 @@ export interface User {
   email: string;
   name: string;
   picture?: string;
+  googleId: string;
+  // 🆕 NEW ONBOARDING FIELDS
+  hasCompletedOnboarding?: boolean;
+  isFirstLogin?: boolean;
+  needsOnboarding?: boolean;
 }
 
 export interface AuthState {

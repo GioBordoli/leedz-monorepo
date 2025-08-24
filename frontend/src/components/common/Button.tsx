@@ -3,13 +3,15 @@ import { motion } from 'framer-motion';
 
 interface ButtonProps {
   children: React.ReactNode;
-  variant?: 'primary' | 'secondary' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'outline';
   size?: 'sm' | 'md' | 'lg';
   className?: string;
   onClick?: () => void;
   href?: string;
   disabled?: boolean;
   type?: 'button' | 'submit' | 'reset';
+  as?: any; // Allow custom component like Link
+  to?: string; // For Link component
 }
 
 const Button: React.FC<ButtonProps> = ({
@@ -21,13 +23,16 @@ const Button: React.FC<ButtonProps> = ({
   href,
   disabled = false,
   type = 'button',
+  as,
+  to,
 }) => {
   const baseClasses = 'inline-flex items-center justify-center font-semibold rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-mint focus:ring-offset-2';
   
   const variantClasses = {
     primary: 'bg-mint-gradient text-white hover:shadow-lg hover:shadow-mint/25 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed',
     secondary: 'bg-white text-text-dark border border-border-light hover:border-mint hover:shadow-lg hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50',
-    ghost: 'text-mint hover:text-mint-light hover:bg-mint/10 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50'
+    ghost: 'text-mint hover:text-mint-light hover:bg-mint/10 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50',
+    outline: 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400 hover:bg-gray-50 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50'
   };
   
   const sizeClasses = {
@@ -47,6 +52,24 @@ const Button: React.FC<ButtonProps> = ({
       {children}
     </motion.span>
   );
+  
+  // Handle custom component (like Link)
+  if (as && !disabled) {
+    const Component = motion(as);
+    return (
+      <Component
+        to={to}
+        href={href}
+        className={classes}
+        onClick={onClick}
+        whileHover={{ scale: 1.01 }}
+        whileTap={{ scale: 0.99 }}
+        transition={{ duration: 0.2 }}
+      >
+        {buttonContent}
+      </Component>
+    );
+  }
   
   if (href && !disabled) {
     return (

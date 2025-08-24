@@ -21,6 +21,8 @@ class AuthService {
    * Get current user info
    */
   async getCurrentUser(token: string): Promise<User> {
+    console.log('🔍 AUTH SERVICE: Getting current user with token...');
+    
     const response = await fetch(`${API_URL}/auth/me`, {
       method: 'GET',
       headers: {
@@ -29,13 +31,17 @@ class AuthService {
       },
     });
 
+    console.log('🔍 AUTH SERVICE: API response status:', response.status);
+
     if (!response.ok) {
       const error = await response.json();
+      console.error('❌ AUTH SERVICE: API error:', error);
       throw new Error(error.error || 'Failed to get user info');
     }
 
-    const data = await response.json();
-    return data.user;
+    const userData = await response.json();
+    console.log('✅ AUTH SERVICE: User data received:', userData);
+    return userData;
   }
 
   /**
@@ -91,15 +97,25 @@ class AuthService {
    * Extract token from URL query params (used after OAuth callback)
    */
   extractTokenFromURL(): string | null {
+    console.log('🔍 AUTH SERVICE: Extracting token from URL:', window.location.href);
+    
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('token');
     
+    console.log('🔍 AUTH SERVICE: Raw token from URL:', token ? 'Found' : 'Not found');
+    
     if (token && this.isValidToken(token)) {
+      console.log('✅ AUTH SERVICE: Token is valid, cleaning URL...');
       // Clean up URL
       const url = new URL(window.location.href);
       url.searchParams.delete('token');
       window.history.replaceState({}, document.title, url.pathname);
+      console.log('✅ AUTH SERVICE: URL cleaned, returning token');
       return token;
+    }
+    
+    if (token) {
+      console.log('❌ AUTH SERVICE: Token found but invalid');
     }
     
     return null;

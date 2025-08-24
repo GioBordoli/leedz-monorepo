@@ -288,13 +288,55 @@ class UserController {
         api_key_status: {
           has_key: hasApiKey,
           key_preview: keyPreview,
-          last_updated: user.updated_at
+          last_updated: user.updated_at,
+          is_valid: hasApiKey // Mark as valid if key exists - testing is optional
         }
       });
 
     } catch (error) {
       console.error('❌ Error getting API key status:', error);
       res.status(500).json({ error: 'Failed to get API key status' });
+    }
+  }
+
+  /**
+   * Complete user onboarding
+   * POST /api/user/complete-onboarding
+   */
+  async completeOnboarding(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ error: 'User not authenticated' });
+        return;
+      }
+
+      // Mark onboarding as completed
+      const updatedUser = await UserModel.completeOnboarding(req.user.id);
+
+      if (!updatedUser) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      console.log('✅ User completed onboarding:', req.user.email);
+
+      res.json({
+        success: true,
+        message: 'Onboarding completed successfully',
+        user: {
+          id: updatedUser.id,
+          email: updatedUser.email,
+          name: updatedUser.name,
+          hasCompletedOnboarding: updatedUser.has_completed_onboarding,
+          onboardingCompletedAt: updatedUser.onboarding_completed_at
+        }
+      });
+    } catch (error) {
+      console.error('❌ Failed to complete onboarding:', error);
+      res.status(500).json({ 
+        error: 'Internal server error',
+        message: 'Failed to complete onboarding'
+      });
     }
   }
 }
