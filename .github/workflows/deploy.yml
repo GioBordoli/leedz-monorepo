@@ -2,101 +2,75 @@ name: Deploy to Production
 
 on:
   push:
-    branches: [ "main" ]
-
-permissions:
-  contents: read
-  id-token: write
-
-env:
-  PROJECT_ID: ${{ secrets.PROJECT_ID }}
-  REGION: ${{ secrets.REGION }}
-  AR_REPO: us-central1-docker.pkg.dev/${{ secrets.PROJECT_ID }}/leedz-repo
+    branches: [ main ]
+  workflow_dispatch:  # Allow manual triggering
 
 jobs:
-  backend:
+  deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - id: auth
+      - name: Test step
+        run: |
+          echo "🚀 Starting deployment..."
+          echo "Repository: ${{ github.repository }}"
+          echo "Branch: ${{ github.ref }}"
+          echo "Commit: ${{ github.sha }}"
+
+      - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      - uses: google-github-actions/setup-gcloud@v2
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
 
       - name: Configure Docker auth
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
-      - name: Build & push backend image
+      - name: Build and deploy backend
         run: |
-          docker build -t $AR_REPO/backend:${{ github.sha }} backend
-          docker push $AR_REPO/backend:${{ github.sha }}
-
-      - name: Deploy Cloud Run (backend)
-        run: |
+          echo "Building backend..."
+          docker build -t us-central1-docker.pkg.dev/${{ secrets.PROJECT_ID }}/leedz-repo/backend:${{ github.sha }} backend
+          docker push us-central1-docker.pkg.dev/${{ secrets.PROJECT_ID }}/leedz-repo/backend:${{ github.sha }}
+          
+          echo "Deploying backend..."
           gcloud run deploy ${{ secrets.BACKEND_SERVICE }} \
-            --image $AR_REPO/backend:${{ github.sha }} \
-            --region ${{ secrets.REGION }} --allow-unauthenticated \
-            --cpu=1 --memory=512Mi --min-instances=1 --max-instances=10 \
+            --image us-central1-docker.pkg.dev/${{ secrets.PROJECT_ID }}/leedz-repo/backend:${{ github.sha }} \
+            --region ${{ secrets.REGION }} \
+            --allow-unauthenticated \
             --port=3001 \
-            --add-cloudsql-instances ${{ secrets.PROJECT_ID }}:${{ secrets.REGION }}:leedz-production-db \
-            --set-env-vars "NODE_ENV=production,PORT=3001,FRONTEND_URL=https://leedz.online" \
+            --set-env-vars "NODE_ENV=production,PORT=3001" \
             --set-env-vars "DATABASE_URL=${{ secrets.DATABASE_URL }}" \
             --set-env-vars "JWT_SECRET=${{ secrets.JWT_SECRET }}" \
-            --set-env-vars "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }},GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}" \
-            --set-env-vars "GOOGLE_REDIRECT_URI=https://leedz.online/auth/callback" \
-            --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${{ secrets.PROJECT_ID }}" \
-            --set-env-vars "STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }},STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}" \
-            --set-env-vars "ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }},MIGRATION_SECRET=${{ secrets.MIGRATION_SECRET }}"
+            --set-env-vars "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" \
+            --set-env-vars "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}" \
+            --set-env-vars "STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}" \
+            --set-env-vars "STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}" \
+            --set-env-vars "ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}" \
+            --set-env-vars "MIGRATION_SECRET=${{ secrets.MIGRATION_SECRET }}"
 
-  frontend:
-    runs-on: ubuntu-latest
-    needs: backend
-    steps:
-      - uses: actions/checkout@v4
-
-      - id: auth
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-      - uses: google-github-actions/setup-gcloud@v2
-
-      - name: Configure Docker auth
-        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
-
-      - name: Build & push frontend image
+      - name: Build and deploy frontend
         run: |
+          echo "Building frontend..."
           docker build \
             --build-arg REACT_APP_API_URL="https://${{ secrets.BACKEND_SERVICE }}-${{ secrets.PROJECT_ID }}.a.run.app/api" \
             --build-arg REACT_APP_GOOGLE_CLIENT_ID="${{ secrets.GOOGLE_CLIENT_ID }}" \
             --build-arg REACT_APP_ENVIRONMENT="production" \
-            -t $AR_REPO/frontend:${{ github.sha }} frontend
-          docker push $AR_REPO/frontend:${{ github.sha }}
-
-      - name: Deploy Cloud Run (frontend)
-        run: |
+            -t us-central1-docker.pkg.dev/${{ secrets.PROJECT_ID }}/leedz-repo/frontend:${{ github.sha }} frontend
+          docker push us-central1-docker.pkg.dev/${{ secrets.PROJECT_ID }}/leedz-repo/frontend:${{ github.sha }}
+          
+          echo "Deploying frontend..."
           gcloud run deploy ${{ secrets.FRONTEND_SERVICE }} \
-            --image $AR_REPO/frontend:${{ github.sha }} \
-            --region ${{ secrets.REGION }} --allow-unauthenticated \
-            --cpu=1 --memory=256Mi --min-instances=0 --max-instances=20 \
-            --port=80 \
-            --set-env-vars "NODE_ENV=production"
-
-      - name: Run database migrations
-        run: |
-          gcloud run jobs create leedz-migrate-${{ github.sha }} \
-            --image $AR_REPO/backend:${{ github.sha }} \
+            --image us-central1-docker.pkg.dev/${{ secrets.PROJECT_ID }}/leedz-repo/frontend:${{ github.sha }} \
             --region ${{ secrets.REGION }} \
-            --add-cloudsql-instances ${{ secrets.PROJECT_ID }}:${{ secrets.REGION }}:leedz-production-db \
-            --set-env-vars "DATABASE_URL=${{ secrets.DATABASE_URL }},MIGRATION_SECRET=${{ secrets.MIGRATION_SECRET }}" \
-            --task-timeout=300 \
-            --execute-now || echo "Migration job may already exist or completed"
+            --allow-unauthenticated \
+            --port=80
 
-      - name: Verify deployment
+      - name: Deployment complete
         run: |
-          echo "🚀 Deployment completed!"
-          echo "Frontend: https://${{ secrets.FRONTEND_SERVICE }}-${{ secrets.PROJECT_ID }}.a.run.app"
-          echo "Backend: https://${{ secrets.BACKEND_SERVICE }}-${{ secrets.PROJECT_ID }}.a.run.app/health" 
+          echo "🎉 Deployment successful!"
+          echo "Frontend URL: https://${{ secrets.FRONTEND_SERVICE }}-${{ secrets.PROJECT_ID }}.a.run.app"
+          echo "Backend URL: https://${{ secrets.BACKEND_SERVICE }}-${{ secrets.PROJECT_ID }}.a.run.app" 
