@@ -1,0 +1,57 @@
+name: 'CI Pipeline'
+
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+    branches:
+      - 'main'
+
+jobs:
+  test-and-build:
+    name: Test and Build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: '**/package-lock.json'
+
+      # ===============================================
+      # Backend Steps
+      # ===============================================
+      - name: 📦 [Backend] Install Dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      - name: 🔨 [Backend] Build Project
+        working-directory: ./backend
+        run: npm run build
+
+      - name: 🐳 [Backend] Build Docker Image
+        run: docker build -t leedz-backend-ci ./backend
+
+      # ===============================================
+      # Frontend Steps
+      # ===============================================
+      - name: 📦 [Frontend] Install Dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: 🧪 [Frontend] Run Tests
+        working-directory: ./frontend
+        run: npm test -- --watchAll=false
+
+      - name: 🔨 [Frontend] Build Project
+        working-directory: ./frontend
+        run: npm run build
+
+      - name: 🐳 [Frontend] Build Docker Image
+        run: docker build -t leedz-frontend-ci ./frontend 
