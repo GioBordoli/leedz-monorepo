@@ -86,43 +86,6 @@ const AuthSuccess: React.FC = () => {
             </p>
           </div>
         )}
-
-        {user && (
-          <div className="bg-gray-50 rounded-lg p-4 mb-6">
-            <p className="text-sm text-gray-600 mb-2">Signed in as:</p>
-            <p className="font-medium text-gray-900">{user.email}</p>
-          </div>
-        )}
-
-        <div className="flex items-center justify-center space-x-2 text-gray-500 mb-6">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          <span className="text-sm">
-            {isLoading ? 'Processing...' : isAuthenticated ? 'Taking you to dashboard...' : 'Redirecting...'}
-          </span>
-        </div>
-
-        {/* Debug Information (remove in production) */}
-        <details className="mt-6 text-left">
-          <summary className="text-sm text-gray-500 cursor-pointer">Debug Info (click to expand)</summary>
-          <pre className="text-xs bg-gray-100 p-2 mt-2 rounded overflow-auto max-h-40">
-            {JSON.stringify(debugInfo, null, 2)}
-          </pre>
-        </details>
-
-        <div className="mt-6 space-y-2">
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="text-mint hover:text-mint/80 text-sm font-medium block"
-          >
-            Go to dashboard immediately
-          </button>
-          <button
-            onClick={() => navigate('/')}
-            className="text-gray-500 hover:text-gray-700 text-sm block"
-          >
-            Back to homepage
-          </button>
-        </div>
       </div>
     </div>
   );

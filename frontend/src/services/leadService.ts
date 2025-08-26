@@ -128,14 +128,19 @@ class LeadService {
     }
 
     return new Promise((resolve, reject) => {
-      // Handle this by making a fetch request that we manually handle as a stream
       fetch(`${API_URL}/leads/search-stream`, {
         method: 'POST',
         headers: this.getHeaders(token),
         body: JSON.stringify(params),
-      }).then(response => {
+      }).then(async response => {
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          try {
+            const errorData = await response.json();
+            const message = errorData.message || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+            throw new Error(message);
+          } catch (_) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
         }
 
         const reader = response.body?.getReader();
@@ -145,53 +150,71 @@ class LeadService {
           throw new Error('No response body reader available');
         }
 
+        let buffer = '';
+
+        const emitEvent = (rawEvent: string) => {
+          // Parse SSE frame: split lines, collect data lines
+          const lines = rawEvent.split('\n');
+          const dataLines: string[] = [];
+          for (const line of lines) {
+            if (line.startsWith('data:')) {
+              dataLines.push(line.slice(5).trimStart());
+            }
+          }
+          if (dataLines.length === 0) return;
+          const dataStr = dataLines.join('\n');
+          try {
+            const data = JSON.parse(dataStr);
+            switch (data.type) {
+              case 'start':
+                callbacks.onStart?.(data.businessType, data.location);
+                break;
+              case 'business_found':
+                callbacks.onBusinessFound?.(data.name, data.found, data.total);
+                break;
+              case 'complete': {
+                const result: SearchResult = {
+                  success: true,
+                  results: data.results,
+                  search: data.search,
+                  usage: data.usage
+                };
+                callbacks.onComplete?.(result);
+                resolve();
+                break;
+              }
+              case 'error':
+                callbacks.onError?.(data.message);
+                reject(new Error(data.message));
+                break;
+            }
+          } catch (e) {
+            // swallow parse errors for partial frames
+          }
+        };
+
         const processStream = async () => {
           try {
             while (true) {
               const { done, value } = await reader.read();
-              
               if (done) {
+                // flush any trailing complete frame if present
+                const frames = buffer.split('\n\n');
+                for (let i = 0; i < frames.length - 1; i++) {
+                  emitEvent(frames[i]);
+                }
                 resolve();
                 break;
               }
 
-              const chunk = decoder.decode(value, { stream: true });
-              const lines = chunk.split('\n');
+              buffer += decoder.decode(value, { stream: true });
 
-              for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                  try {
-                    const data = JSON.parse(line.slice(6));
-                    
-                    switch (data.type) {
-                      case 'start':
-                        callbacks.onStart?.(data.businessType, data.location);
-                        break;
-                      
-                      case 'business_found':
-                        callbacks.onBusinessFound?.(data.name, data.found, data.total);
-                        break;
-                      
-                      case 'complete':
-                        const result: SearchResult = {
-                          success: true,
-                          results: data.results,
-                          search: data.search,
-                          usage: data.usage
-                        };
-                        callbacks.onComplete?.(result);
-                        resolve();
-                        return;
-                      
-                      case 'error':
-                        callbacks.onError?.(data.message);
-                        reject(new Error(data.message));
-                        return;
-                    }
-                  } catch (parseError) {
-                    console.warn('Failed to parse SSE data:', line);
-                  }
-                }
+              // process complete SSE events delimited by blank line
+              let sepIndex: number;
+              while ((sepIndex = buffer.indexOf('\n\n')) !== -1) {
+                const rawEvent = buffer.slice(0, sepIndex);
+                emitEvent(rawEvent);
+                buffer = buffer.slice(sepIndex + 2); // Only discard consumed portion; keep remainder
               }
             }
           } catch (error) {
@@ -232,7 +255,7 @@ class LeadService {
   }
 
   /**
-   * Get current usage statistics
+   * Get current usage statistics (legacy format for backward compatibility)
    */
   async getUsageStats(token?: string): Promise<UsageStats> {
     try {
@@ -246,7 +269,33 @@ class LeadService {
         throw new Error(errorData.message || errorData.error || 'Failed to get usage stats');
       }
 
-      return await response.json();
+      const result = await response.json();
+      
+      console.log('🔍 Raw API response for usage stats:', result);
+      
+      // Convert new enhanced format to legacy format for backward compatibility
+      if (result.success && result.data) {
+        const { data } = result;
+        const legacyFormat = {
+          success: true,
+          usage: {
+            monthlyCount: data.usage?.current || 0,
+            monthlyLimit: data.usage?.limit || 10000,
+            remaining: typeof data.usage?.remaining === 'number' ? data.usage.remaining : 0,
+            resetMonth: data.period?.resetDate || new Date().toISOString(),
+            percentUsed: data.usage?.percentage || 0
+          },
+          apiKey: {
+            configured: data.apiKey?.configured || false,
+            lastUpdated: data.apiKey?.lastUpdated || new Date().toISOString()
+          }
+        };
+        console.log('✅ Converted to legacy format:', legacyFormat);
+        return legacyFormat as unknown as UsageStats;
+      }
+      
+      console.log('⚠️ Using raw response (not new format):', result);
+      return result as UsageStats;
     } catch (error) {
       console.error('❌ Failed to get usage stats:', error);
       throw error;

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import SearchForm from '../../components/leads/SearchForm';
 import SearchResults from '../../components/leads/SearchResults';
+import EnhancedUsageCard from '../../components/dashboard/EnhancedUsageCard';
 import leadService, { SearchParams, SearchResult, UsageStats, StreamingCallbacks } from '../../services/leadService';
 import { 
   Search, 
@@ -10,7 +11,6 @@ import {
   LogOut, 
   User, 
   Play,
-  Database,
   Zap,
   AlertTriangle
 } from 'lucide-react';
@@ -22,27 +22,26 @@ const Dashboard: React.FC = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [streamingBusinessNames, setStreamingBusinessNames] = useState<string[]>([]);
   const [searchProgress, setSearchProgress] = useState<{ found: number; total: number } | undefined>();
-  const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
+  // Note: usageStats moved to EnhancedUsageCard component
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load usage stats and API key status on component mount
-  const loadUsageStats = useCallback(async () => {
+  // Load API key status on component mount  
+  const loadApiKeyStatus = useCallback(async () => {
     if (!token) return;
     
     try {
       const stats = await leadService.getUsageStats(token);
-      setUsageStats(stats);
       setApiKeyConfigured(stats.apiKey.configured);
     } catch (error) {
-      console.error('Failed to load usage stats:', error);
-      // Don't show error for stats loading failure
+      console.error('Failed to load API key status:', error);
+      // Don't show error for API key status loading failure
     }
   }, [token]);
 
   useEffect(() => {
-    loadUsageStats();
-  }, [loadUsageStats]);
+    loadApiKeyStatus();
+  }, [loadApiKeyStatus]);
 
   const handleLogout = async () => {
     try {
@@ -92,8 +91,8 @@ const Dashboard: React.FC = () => {
           setStreamingBusinessNames([]);
           setSearchProgress(undefined);
           
-          // Update usage stats after successful search
-          loadUsageStats();
+          // Refresh API key status after successful search
+          loadApiKeyStatus();
         },
         
         onError: (errorMessage) => {
@@ -302,42 +301,8 @@ const Dashboard: React.FC = () => {
             </Link>
           </div>
 
-          {/* Usage Stats Card */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:shadow-mint/10 hover:border-mint/30 transition-all duration-300">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Database className="w-5 h-5 text-blue-600" />
-              </div>
-              <h3 className="text-lg font-semibold text-ink">This Month's Usage</h3>
-            </div>
-            
-            <div className="mb-2">
-              <div className="text-3xl font-bold text-ink">
-                {usageStats?.usage.monthlyCount || 0} / {usageStats?.usage.monthlyLimit || 10000}
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                <div 
-                  className="bg-mint h-2 rounded-full transition-all duration-300" 
-                  style={{ 
-                    width: `${Math.min(100, ((usageStats?.usage.monthlyCount || 0) / (usageStats?.usage.monthlyLimit || 10000)) * 100)}%` 
-                  }}
-                ></div>
-              </div>
-            </div>
-            
-            <p className="text-sm text-gray-500">
-              Resets: {usageStats?.usage.resetMonth ? 
-                new Date(new Date(usageStats.usage.resetMonth).getFullYear(), new Date(usageStats.usage.resetMonth).getMonth() + 1, 1)
-                  .toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) 
-                : 'Next month'}
-            </p>
-            
-            {usageStats && usageStats.usage.monthlyCount > 0 && (
-              <p className="text-sm text-mint mt-2">
-                You're using your quota efficiently. Great job!
-              </p>
-            )}
-          </div>
+          {/* Enhanced Usage Stats Card */}
+          <EnhancedUsageCard />
 
           {/* Learn & Grow Card */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:shadow-mint/10 hover:border-mint/30 transition-all duration-300">

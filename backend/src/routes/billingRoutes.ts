@@ -1,28 +1,25 @@
 import express from 'express';
-import { BillingController } from '../controllers/BillingController';
-import { authenticateJWT } from '../middleware/authMiddleware';
+import { authenticateJWT, optionalAuth } from '../middleware/authMiddleware';
+import BillingController from '../controllers/BillingController';
 
 const router = express.Router();
+const billingController = new BillingController();
 
-// Apply auth middleware to all billing routes except webhooks
+// Apply auth middleware to all billing routes except public endpoints
 router.use((req, res, next) => {
-  // Skip auth for webhook endpoint (it has its own validation)
-  if (req.path === '/webhook') {
+  // Skip auth for public endpoints
+  if (req.path === '/plans') {
     return next();
   }
   return authenticateJWT(req, res, next);
 });
 
-// GET /api/billing/status - Get user's billing status
-router.get('/status', BillingController.getBillingStatus);
+// GET /api/billing/status
+// Enhanced billing status with comprehensive tier information (protected)
+router.get('/status', billingController.getBillingStatus.bind(billingController));
 
-// POST /api/billing/create-checkout-session - Create a new checkout session
-router.post('/create-checkout-session', BillingController.createCheckoutSession);
-
-// POST /api/billing/create-portal-session - Create customer portal session
-router.post('/create-portal-session', BillingController.createPortalSession);
-
-// POST /api/billing/webhook - Handle Stripe webhooks (no auth required)
-router.post('/webhook', BillingController.handleWebhook);
+// GET /api/billing/plans  
+// Plan comparison and pricing information (public endpoint with optional auth)
+router.get('/plans', optionalAuth, billingController.getPlans.bind(billingController));
 
 export default router; 

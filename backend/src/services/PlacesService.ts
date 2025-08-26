@@ -65,7 +65,8 @@ export class PlacesService {
   async searchBusinesses(
     params: SearchParams,
     progressCallback?: (progress: SearchProgress) => void,
-    userId?: number
+    userId?: number,
+    shouldAbort?: () => boolean
   ): Promise<LeadData[]> {
     const { businessType, location, maxResults = 25, radius = 10000 } = params;
 
@@ -113,6 +114,11 @@ export class PlacesService {
       const maxPages = Math.ceil(maxResults / 20); // Each page returns up to 20 results
 
       do {
+        if (shouldAbort?.()) {
+          console.log('⏹️ Aborting pagination due to shouldAbort() signal');
+          break;
+        }
+
         const nearbyParams: any = {
           location: { lat, lng },
           radius,
@@ -142,7 +148,7 @@ export class PlacesService {
           await this.delay(2000); // 2 second delay as required by Google
         }
 
-      } while (nextPageToken && pageCount < maxPages && allApiPlaces.length < maxResults);
+      } while (nextPageToken && pageCount < maxPages && allApiPlaces.length < maxResults && !shouldAbort?.());
 
       console.log(`📊 Total API results across ${pageCount} pages: ${allApiPlaces.length}`);
 
@@ -153,6 +159,11 @@ export class PlacesService {
       console.log(`🆕 Processing ${apiPlaces.length} new places (${allApiPlaces.length - apiPlaces.length} already cached)`);
 
       for (let i = 0; i < Math.min(apiPlaces.length, maxResults - cachedLeads.length); i++) {
+        if (shouldAbort?.()) {
+          console.log('⏹️ Aborting details fetch due to shouldAbort() signal');
+          break;
+        }
+
         const place = apiPlaces[i];
         
         if (!place?.place_id) {
@@ -547,7 +558,8 @@ export class PlacesService {
   async searchBusinessesGrid(
     params: SearchParams,
     progressCallback?: (progress: SearchProgress) => void,
-    userId?: number
+    userId?: number,
+    shouldAbort?: () => boolean
   ): Promise<LeadData[]> {
     try {
       console.log(`🔍 Starting grid-based search for ${params.businessType} in ${params.location}`);
@@ -567,6 +579,10 @@ export class PlacesService {
       const allLeads: LeadData[] = [];
       
       for (let i = 0; i < searchGrid.length; i++) {
+        if (shouldAbort?.()) {
+          console.log('⏹️ Aborting grid search loop due to shouldAbort() signal');
+          break;
+        }
         const gridPoint = searchGrid[i];
         if (!gridPoint) continue; // Skip if undefined
         
@@ -579,10 +595,15 @@ export class PlacesService {
           location: `${gridPoint.lat},${gridPoint.lng}`,
           maxResults: 60,
           radius: gridPoint.radius
-        }, progressCallback, userId);
+        }, progressCallback, userId, shouldAbort);
         
         allLeads.push(...gridLeads);
         console.log(`✅ ${gridPoint.area}: Found ${gridLeads.length} leads (Total: ${allLeads.length})`);
+        
+        if (shouldAbort?.()) {
+          console.log('⏹️ Aborting after area due to shouldAbort() signal');
+          break;
+        }
         
         // Rate limiting between grid searches
         if (i < searchGrid.length - 1) {
@@ -605,7 +626,7 @@ export class PlacesService {
       console.error('Error in grid-based search:', error);
       // Fall back to single-location search if grid search fails
       console.log('⚠️ Falling back to single-location search');
-      return this.searchBusinesses(params, progressCallback, userId);
+      return this.searchBusinesses(params, progressCallback, userId, shouldAbort);
     }
   }
 }

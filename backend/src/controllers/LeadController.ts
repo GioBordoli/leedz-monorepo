@@ -47,20 +47,10 @@ class LeadController {
         return;
       }
 
-      // Get user and check usage limits
+      // Get user and usage/tier context
       const user = await UserModel.findById(req.user.id);
       if (!user) {
         res.status(404).json({ error: 'User not found' });
-        return;
-      }
-
-      // Check subscription status
-      if (user.subscription_status !== 'active') {
-        res.status(403).json({ 
-          error: 'Subscription required',
-          message: 'An active subscription is required to search for leads',
-          subscriptionStatus: user.subscription_status
-        });
         return;
       }
 
@@ -73,12 +63,10 @@ class LeadController {
         return;
       }
 
-      // Check monthly usage limits (10,000 per month)
-      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+      // Ensure current month usage window
+      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
       const userResetMonth = user.usage_reset_month?.toISOString().slice(0, 7);
-      
       if (userResetMonth !== currentMonth) {
-        // Reset monthly count for new month
         await UserModel.update(user.id, {
           monthly_usage_count: 0,
           usage_reset_month: new Date()
@@ -86,14 +74,23 @@ class LeadController {
         user.monthly_usage_count = 0;
       }
 
-      // Check if user has basic remaining capacity (grid search will use more leads)
-      const estimatedLeads = 300; // Conservative estimate for grid search
-      if (user.monthly_usage_count + estimatedLeads > 10000) {
-        res.status(429).json({ 
-          error: 'Monthly usage limit exceeded',
-          message: `You have ${10000 - user.monthly_usage_count} searches remaining this month`,
-          monthlyLimit: 10000,
-          currentUsage: user.monthly_usage_count
+      // Get limit and tier
+      const monthlyLimit = await UserModel.getMonthlyLimitForUser(user.id);
+      const isFreeTier = (await UserModel.getUserTier(user.id)) === 'free';
+
+      // Pre-start limit check only: block if already at/over limit
+      if (user.monthly_usage_count >= monthlyLimit) {
+        const upgradeMessage = isFreeTier 
+          ? ' Upgrade to Pro for unlimited leads!'
+          : ' Contact support if you need a higher limit.';
+        res.status(429).json({
+          error: 'Monthly usage limit reached',
+          message: `You have 0 leads remaining this month.${upgradeMessage}`,
+          monthlyLimit,
+          currentUsage: user.monthly_usage_count,
+          isFreeTier,
+          canUpgrade: isFreeTier,
+          tier: isFreeTier ? 'free' : 'pro'
         });
         return;
       }
@@ -125,7 +122,7 @@ class LeadController {
       const searchParams: SearchParams = {
         businessType,
         location,
-        radius: 10000 // 10km radius - reasonable for most searches
+        radius: 10000 // 10km radius
       };
 
       const results = await placesService.searchBusinessesGrid(searchParams, (progress: SearchProgress) => {
@@ -138,14 +135,18 @@ class LeadController {
             total: progress.total
           })}\n\n`);
         }
-      }, user.id); // Pass userId for duplicate prevention
+      }, user.id);
 
-      // Update user's daily usage count
-      await UserModel.update(user.id, {
-        monthly_usage_count: user.monthly_usage_count + results.length
-      });
+      // Update user's monthly usage count by the number actually delivered
+      const increment = results.length;
+      if (increment > 0) {
+        await UserModel.update(user.id, {
+          monthly_usage_count: user.monthly_usage_count + increment
+        });
+        user.monthly_usage_count += increment;
+      }
 
-      console.log(`✅ Streaming search completed for ${user.email}: ${results.length} leads found`);
+      console.log(`✅ Streaming search completed for ${user.email}: ${results.length} leads returned`);
 
       // Send final results
       res.write(`data: ${JSON.stringify({
@@ -154,14 +155,17 @@ class LeadController {
         search: {
           businessType,
           location,
-          requested: results.length, // We get all available leads with grid search
+          requested: results.length,
           found: results.length,
           timestamp: new Date().toISOString()
         },
         usage: {
-          todayCount: user.monthly_usage_count + results.length,
-          dailyLimit: 10000,
-          remaining: 10000 - (user.monthly_usage_count + results.length)
+          monthlyCount: user.monthly_usage_count,
+          monthlyLimit: monthlyLimit,
+          remaining: isFreeTier 
+            ? Math.max(0, monthlyLimit - user.monthly_usage_count)
+            : 'unlimited',
+          tier: isFreeTier ? 'free' : 'pro'
         }
       })}\n\n`);
 
@@ -232,16 +236,6 @@ class LeadController {
         return;
       }
 
-      // Check subscription status
-      if (user.subscription_status !== 'active') {
-        res.status(403).json({ 
-          error: 'Subscription required',
-          message: 'An active subscription is required to search for leads',
-          subscriptionStatus: user.subscription_status
-        });
-        return;
-      }
-
       // Check if user has API key
       if (!user.places_api_key) {
         res.status(400).json({ 
@@ -251,12 +245,10 @@ class LeadController {
         return;
       }
 
-      // Check monthly usage limits (10,000 per month)
-      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+      // Check monthly usage window reset
+      const currentMonth = new Date().toISOString().slice(0, 7);
       const userResetMonth = user.usage_reset_month?.toISOString().slice(0, 7);
-      
       if (userResetMonth !== currentMonth) {
-        // Reset monthly count for new month
         await UserModel.update(user.id, {
           monthly_usage_count: 0,
           usage_reset_month: new Date()
@@ -264,13 +256,24 @@ class LeadController {
         user.monthly_usage_count = 0;
       }
 
-      // Check if user has exceeded monthly limit
-      if (user.monthly_usage_count + requestedResults > 10000) {
+      // Check if user has exceeded monthly limit (keep non-streaming behavior as-is)
+      const monthlyLimit = await UserModel.getMonthlyLimitForUser(user.id);
+      const isFreeTier = (await UserModel.getUserTier(user.id)) === 'free';
+      
+      if (user.monthly_usage_count + requestedResults > monthlyLimit) {
+        const remainingLeads = Math.max(0, monthlyLimit - user.monthly_usage_count);
+        const upgradeMessage = isFreeTier 
+          ? ' Upgrade to Pro for unlimited leads!' 
+          : ' Contact support if you need a higher limit.';
+          
         res.status(429).json({ 
-          error: 'Monthly usage limit exceeded',
-          message: `You have ${10000 - user.monthly_usage_count} searches remaining this month`,
-          monthlyLimit: 10000,
-          currentUsage: user.monthly_usage_count
+          error: 'Monthly usage limit reached',
+          message: `You have ${remainingLeads} leads remaining this month.${upgradeMessage}`,
+          monthlyLimit,
+          currentUsage: user.monthly_usage_count,
+          isFreeTier,
+          canUpgrade: isFreeTier,
+          tier: isFreeTier ? 'free' : 'pro'
         });
         return;
       }
@@ -298,7 +301,7 @@ class LeadController {
       const results = await placesService.searchBusinesses(searchParams, (progress: SearchProgress) => {
         // TODO: In future milestone, send progress via WebSocket
         console.log(`📊 Search progress: ${progress.found}/${progress.total} - ${progress.currentLocation || 'Searching...'}`);
-      }, user.id); // Pass userId for duplicate prevention
+      }, user.id);
 
       // Update user's daily usage count
       await UserModel.update(user.id, {
@@ -319,9 +322,12 @@ class LeadController {
           timestamp: new Date().toISOString()
         },
         usage: {
-          todayCount: user.monthly_usage_count + results.length,
-          dailyLimit: 10000,
-          remaining: 10000 - (user.monthly_usage_count + results.length)
+          monthlyCount: user.monthly_usage_count + results.length,
+          monthlyLimit: monthlyLimit,
+          remaining: isFreeTier 
+            ? Math.max(0, monthlyLimit - (user.monthly_usage_count + results.length))
+            : 'unlimited',
+          tier: isFreeTier ? 'free' : 'pro'
         }
       });
 
@@ -383,24 +389,122 @@ class LeadController {
         resetMonth = new Date(); // Current month start
       }
 
+      // Get dynamic limits based on user tier
+      const monthlyLimit = await UserModel.getMonthlyLimitForUser(req.user.id);
+      const tier = await UserModel.getUserTier(req.user.id);
+      const isFreeTier = tier === 'free';
+
+      // Calculate usage metrics
+      const remainingLeads = isFreeTier ? Math.max(0, monthlyLimit - currentUsage) : null;
+      const usagePercentage = isFreeTier ? Math.round((currentUsage / monthlyLimit) * 100) : 0;
+      
+      // Determine usage status for UI alerts
+      const isNearLimit = isFreeTier && usagePercentage >= 95;
+      const isApproachingLimit = isFreeTier && usagePercentage >= 80;
+      const isOverLimit = isFreeTier && currentUsage >= monthlyLimit;
+
+      // Calculate days until reset (user anniversary-based)
+      const now = new Date();
+      const nextReset = new Date(resetMonth || now);
+      nextReset.setMonth(nextReset.getMonth() + 1);
+      const daysUntilReset = Math.ceil((nextReset.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+      // Enhanced usage response
       res.json({
         success: true,
-        usage: {
-          monthlyCount: currentUsage,
-          monthlyLimit: 10000,
-          remaining: 10000 - currentUsage,
-          resetMonth: resetMonth,
-          percentUsed: Math.round((currentUsage / 10000) * 100)
+        data: {
+          // Core usage statistics
+          usage: {
+            current: currentUsage,
+            limit: isFreeTier ? monthlyLimit : null,
+            remaining: remainingLeads,
+            percentage: usagePercentage,
+            isUnlimited: !isFreeTier
+          },
+
+          // Timing information
+          period: {
+            resetDate: resetMonth,
+            nextResetDate: nextReset.toISOString(),
+            daysUntilReset: daysUntilReset,
+            currentMonth: currentMonth
+          },
+
+          // User tier information
+          tier: {
+            current: tier,
+            name: isFreeTier ? 'Free' : 'Pro',
+            canUpgrade: isFreeTier
+          },
+
+          // Status flags for UI logic
+          status: {
+            isNearLimit: isNearLimit,
+            isApproachingLimit: isApproachingLimit,
+            isOverLimit: isOverLimit,
+            needsUpgrade: isOverLimit,
+            hasApiKey: !!user.places_api_key
+          },
+
+          // API key configuration
+          apiKey: {
+            configured: !!user.places_api_key,
+            lastUpdated: user.updated_at,
+            isRequired: true
+          },
+
+          // Action recommendations
+          recommendations: this.getUsageRecommendations(usagePercentage, isFreeTier, !!user.places_api_key)
         },
-        apiKey: {
-          configured: !!user.places_api_key,
-          lastUpdated: user.updated_at
-        }
+        timestamp: new Date().toISOString()
       });
     } catch (error) {
       console.error('❌ Failed to get usage stats:', error);
-      res.status(500).json({ error: 'Failed to get usage statistics' });
+      res.status(500).json({ 
+        success: false,
+        error: 'Failed to get usage statistics',
+        timestamp: new Date().toISOString()
+      });
     }
+  }
+
+  /**
+   * Generate actionable recommendations based on user usage patterns
+   * Following business logic best practices for user engagement
+   */
+  private getUsageRecommendations(usagePercentage: number, isFreeTier: boolean, hasApiKey: boolean): string[] {
+    const recommendations: string[] = [];
+
+    // API key recommendations (highest priority)
+    if (!hasApiKey) {
+      recommendations.push('Set up your Google Places API key to start generating leads');
+      return recommendations; // Return early if no API key
+    }
+
+    // Usage-based recommendations for free tier
+    if (isFreeTier) {
+      if (usagePercentage >= 95) {
+        recommendations.push('You\'ve nearly reached your monthly limit. Upgrade to Pro for unlimited leads!');
+        recommendations.push('Consider upgrading before your next big lead generation campaign');
+      } else if (usagePercentage >= 80) {
+        recommendations.push('You\'re approaching your monthly limit. Consider upgrading to Pro');
+        recommendations.push('Plan your remaining searches carefully or upgrade for unlimited access');
+      } else if (usagePercentage >= 50) {
+        recommendations.push('You\'re halfway through your monthly leads. Upgrade anytime for unlimited access');
+      } else if (usagePercentage < 10) {
+        recommendations.push('Great start! You have plenty of leads remaining this month');
+        recommendations.push('Explore different business types and locations to maximize your results');
+      }
+    } else {
+      // Pro tier recommendations
+      if (usagePercentage >= 80) {
+        recommendations.push('High usage detected. Consider optimizing your search criteria for best results');
+      } else if (usagePercentage < 10) {
+        recommendations.push('You have unlimited access – explore broader searches and categories');
+      }
+    }
+
+    return recommendations;
   }
 
   /**
@@ -816,4 +920,4 @@ class LeadController {
   }
 }
 
-export default LeadController; 
+export default new LeadController(); 

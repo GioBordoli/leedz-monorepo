@@ -1,36 +1,48 @@
+import { 
+  BillingStatusResponse, 
+  PlansResponse, 
+  UsageStatsResponse,
+  EnhancedBillingStatus,
+  PlanInfo,
+  EnhancedUsageStats,
+  // Legacy types for backward compatibility
+  BillingStatus,
+  CheckoutSession,
+  PortalSession
+} from '../types/billing';
+
 // Stripe Payment Links (no Stripe SDK needed)
 const STRIPE_PAYMENT_LINKS = {
   monthly: 'https://buy.stripe.com/cNi5kE84of4lb0Xc4Qdby00',
   yearly: 'https://buy.stripe.com/aFa3cwdoI09r5GD5Gsdby01'
 };
 
-export interface BillingStatus {
-  hasSubscription: boolean;
-  subscriptionStatus: 'active' | 'inactive' | 'cancelled';
-  subscriptionPlan: string;
-  hasPaymentMethod: boolean;
-}
-
-export interface CheckoutSession {
-  sessionId: string;
-  url: string;
-}
-
-export interface PortalSession {
-  url: string;
-}
-
 class BillingService {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+    this.baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001'; // TODO: change to production URL
   }
 
   /**
-   * Get user's current billing status
+   * Get user's current billing status (legacy format for backward compatibility)
    */
   async getBillingStatus(): Promise<BillingStatus> {
+    const enhanced = await this.getEnhancedBillingStatus();
+    
+    // Convert enhanced format to legacy format
+    return {
+      hasSubscription: enhanced.subscription.isActive,
+      subscriptionStatus: enhanced.subscription.status,
+      subscriptionPlan: enhanced.subscription.plan,
+      hasPaymentMethod: enhanced.flags.hasPaymentMethod
+    };
+  }
+
+  /**
+   * Get comprehensive billing status with enhanced tier information
+   */
+  async getEnhancedBillingStatus(): Promise<EnhancedBillingStatus> {
     const token = localStorage.getItem('authToken');
     if (!token) {
       throw new Error('No authentication token found');
@@ -44,10 +56,70 @@ class BillingService {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to fetch billing status');
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to fetch billing status');
     }
 
-    return response.json();
+    const result: BillingStatusResponse = await response.json();
+    
+    if (!result.success) {
+      throw new Error('API returned error status');
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Get available plans and pricing information (public endpoint)
+   */
+  async getPlans(): Promise<PlanInfo[]> {
+    const response = await fetch(`${this.baseUrl}/api/billing/plans`, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch plans');
+    }
+
+    const result: PlansResponse = await response.json();
+    
+    if (!result.success) {
+      throw new Error('API returned error status');
+    }
+
+    return result.data.plans;
+  }
+
+  /**
+   * Get enhanced usage statistics
+   */
+  async getUsageStats(): Promise<EnhancedUsageStats> {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+
+    const response = await fetch(`${this.baseUrl}/api/leads/usage`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to fetch usage stats');
+    }
+
+    const result: UsageStatsResponse = await response.json();
+    
+    if (!result.success) {
+      throw new Error('API returned error status');
+    }
+
+    return result.data;
   }
 
   /**
@@ -110,13 +182,6 @@ class BillingService {
       console.error('Error redirecting to portal:', error);
       throw error;
     }
-  }
-
-  /**
-   * Get Stripe instance
-   */
-  async getStripe() {
-    return await stripePromise;
   }
 }
 

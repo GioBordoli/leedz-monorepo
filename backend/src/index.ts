@@ -48,7 +48,7 @@ app.use('/api/user', userRoutes);
 // Lead generation routes (protected)
 app.use('/api/leads', leadRoutes);
 
-// Billing routes (Stripe integration)
+// Billing routes (protected)
 app.use('/api/billing', billingRoutes);
 
 // Error handling middleware

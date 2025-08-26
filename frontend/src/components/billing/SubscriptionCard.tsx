@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CreditCard, CheckCircle, XCircle, AlertCircle, ExternalLink } from 'lucide-react';
-import billingService, { BillingStatus } from '../../services/billingService';
+import billingService from '../../services/billingService';
+import { BillingStatus } from '../../types/billing';
 import Button from '../common/Button';
 import { useAuth } from '../../hooks/useAuth';
 

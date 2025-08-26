@@ -108,7 +108,7 @@ const PricingSection: React.FC = () => {
         animate="visible"
       >
         <motion.div
-          className="relative bg-white rounded-2xl border-2 border-mint shadow-2xl p-8 transform hover:scale-105 transition-all duration-300"
+          className="relative bg-white rounded-2xl border-2 border-mint p-8"
           variants={itemVariants}
           whileHover={{ y: -8 }}
         >
@@ -163,6 +163,14 @@ const PricingSection: React.FC = () => {
             ))}
           </div>
 
+          {/* Trust copy above CTA */}
+          <motion.p
+            className="text-sm text-gray-600 text-center mb-3"
+            variants={itemVariants}
+          >
+            Start for free — no credit card required
+          </motion.p>
+
           {/* CTA Button */}
           <motion.div variants={itemVariants}>
             <Button
@@ -172,22 +180,10 @@ const PricingSection: React.FC = () => {
               onClick={() => authService.login()}
             >
               <UserPlus className="w-5 h-5" />
-              <span>Sign up</span>
+              <span>Start free</span>
             </Button>
           </motion.div>
 
-          {/* Secondary CTA */}
-          <motion.div className="text-center" variants={itemVariants}>
-            <button
-              className="text-mint hover:text-mint-light font-medium transition-colors"
-              onClick={() => {
-                // TODO: Open sample sheet
-                console.log('See sample sheet clicked');
-              }}
-            >
-              See sample Sheet →
-            </button>
-          </motion.div>
 
           {/* Subtle glow effect */}
           <div className="absolute -inset-1 bg-mint-gradient opacity-20 blur-lg rounded-2xl -z-10" />
@@ -202,9 +198,9 @@ const PricingSection: React.FC = () => {
         animate="visible"
       >
         <motion.div
-          className="bg-gradient-to-br from-mint/5 to-mint-light/5 border border-mint/20 rounded-xl p-8 max-w-2xl mx-auto"
+          className="bg-white border border-mint/20 rounded-xl p-8 max-w-2xl mx-auto"
           whileHover={{ scale: 1.02 }}
-          transition={{ duration: 0.3 }}
+          transition={{ duration: 0.05 }}
         >
           <div className="w-16 h-16 bg-mint-gradient rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
             <Zap className="w-8 h-8 text-white" />

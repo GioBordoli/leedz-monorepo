@@ -9,9 +9,7 @@ const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 let stripe: Stripe | null = null;
 
 if (stripeSecretKey && stripeSecretKey.length > 0 && !stripeSecretKey.includes('placeholder')) {
-  stripe = new Stripe(stripeSecretKey, {
-    apiVersion: '2025-07-30.basil', // Latest API version
-  });
+  stripe = new Stripe(stripeSecretKey);
   console.log('✅ Stripe SDK initialized successfully');
 } else {
   console.warn('⚠️  Stripe not initialized - STRIPE_SECRET_KEY not configured');

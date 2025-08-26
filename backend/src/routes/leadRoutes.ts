@@ -1,9 +1,8 @@
 import express from 'express';
 import { authenticateJWT } from '../middleware/authMiddleware';
-import LeadController from '../controllers/LeadController';
+import leadController from '../controllers/LeadController';
 
 const router = express.Router();
-const leadController = new LeadController();
 
 // All lead routes require authentication
 router.use(authenticateJWT);

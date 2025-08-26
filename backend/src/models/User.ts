@@ -446,11 +446,35 @@ export class UserModel {
   }
 
   /**
-   * NEW: Check if user has reached monthly limit (10,000 leads)
+   * Get monthly usage limit based on user's subscription tier
+   * Follows Open/Closed Principle - easy to extend with new tiers
+   */
+  static async getMonthlyLimitForUser(id: number): Promise<number> {
+    const user = await this.findById(id);
+    if (!user) {
+      throw new Error('User not found');
+    }
+    
+    // Tier-based limits following Strategy pattern
+    return user.subscription_status === 'active' ? 10000 : 1000;
+  }
+
+  /**
+   * Check if user has reached their tier-appropriate monthly limit
+   * Uses dependency injection of limit calculation
    */
   static async hasReachedMonthlyLimit(id: number): Promise<boolean> {
+    const limit = await this.getMonthlyLimitForUser(id);
     const usage = await this.getMonthlyUsage(id);
-    return usage.count >= 10000;
+    return usage.count >= limit;
+  }
+
+  /**
+   * Get user's tier information for business logic decisions
+   */
+  static async getUserTier(id: number): Promise<'free' | 'pro'> {
+    const user = await this.findById(id);
+    return user && user.subscription_status === 'active' ? 'pro' : 'free';
   }
 
   /**
