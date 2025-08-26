@@ -36,10 +36,8 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({ className = 
   }, [isAuthenticated, token]);
 
   useEffect(() => {
-    if (isAuthenticated && token) {
-      fetchBillingStatus();
-    }
-  }, [isAuthenticated, token, fetchBillingStatus]);
+    fetchBillingStatus();
+  }, [fetchBillingStatus]);
 
   const handleSubscribe = async () => {
     if (!isAuthenticated || !token) {

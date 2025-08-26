@@ -14,11 +14,13 @@ const AuthSuccess: React.FC = () => {
       const timer = setTimeout(() => {
         navigate('/dashboard');
       }, 1500);
+
       return () => clearTimeout(timer);
     } else if (!isLoading && !isAuthenticated) {
       const timer = setTimeout(() => {
         navigate('/');
       }, 3000);
+
       return () => clearTimeout(timer);
     }
   }, [navigate, user, isLoading, isAuthenticated, searchParams]);
