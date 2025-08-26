@@ -4,7 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import SearchForm from '../../components/leads/SearchForm';
 import SearchResults from '../../components/leads/SearchResults';
 import EnhancedUsageCard from '../../components/dashboard/EnhancedUsageCard';
-import leadService, { SearchParams, SearchResult, UsageStats, StreamingCallbacks } from '../../services/leadService';
+import leadService, { SearchParams, SearchResult, StreamingCallbacks } from '../../services/leadService';
 import { 
   Search, 
   Settings as SettingsIcon, 

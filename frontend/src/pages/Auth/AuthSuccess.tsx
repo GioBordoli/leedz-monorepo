@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
@@ -7,40 +7,18 @@ const AuthSuccess: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, isLoading, isAuthenticated } = useAuth();
-  const [debugInfo, setDebugInfo] = useState<any>({});
 
   useEffect(() => {
-    // DEBUGGING: Capture all relevant information
-    const debug = {
-      timestamp: new Date().toISOString(),
-      url: window.location.href,
-      hasTokenInURL: searchParams.has('token'),
-      tokenValue: searchParams.get('token')?.substring(0, 20) + '...', // First 20 chars only
-      userState: user,
-      isLoading,
-      isAuthenticated,
-      localStorage: {
-        hasOnboardingData: !!localStorage.getItem(`onboarding_completed_${user?.id}`)
-      }
-    };
-    
-    setDebugInfo(debug);
-    console.log('🔍 AUTH SUCCESS DEBUG:', debug);
-
     // Only redirect after authentication is confirmed and not loading
     if (!isLoading && isAuthenticated && user) {
-      console.log('✅ Authentication confirmed, redirecting to dashboard...');
       const timer = setTimeout(() => {
         navigate('/dashboard');
-      }, 1500); // Slightly shorter delay
-
+      }, 1500);
       return () => clearTimeout(timer);
     } else if (!isLoading && !isAuthenticated) {
-      console.log('❌ Authentication failed, redirecting to home...');
       const timer = setTimeout(() => {
         navigate('/');
       }, 3000);
-
       return () => clearTimeout(timer);
     }
   }, [navigate, user, isLoading, isAuthenticated, searchParams]);

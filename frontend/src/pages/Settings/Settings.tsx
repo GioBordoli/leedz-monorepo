@@ -20,8 +20,7 @@ import {
   FileSpreadsheet,
   XCircle,
   Webhook,
-  CreditCard,
-  Settings as SettingsIcon
+  CreditCard
 } from 'lucide-react';
 import { SubscriptionCard } from '../../components/billing/SubscriptionCard';
 

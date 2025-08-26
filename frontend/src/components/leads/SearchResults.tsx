@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Download, ExternalLink, Phone, Globe, MapPin, Star, FileSpreadsheet, CheckCircle, XCircle, Search } from 'lucide-react';
+import { Download, MapPin, FileSpreadsheet, CheckCircle, XCircle, Search } from 'lucide-react';
 import { SearchResult, ExportOptions } from '../../services/leadService';
 import leadService from '../../services/leadService';
 import SheetSelector from './SheetSelector';
@@ -140,16 +140,6 @@ const SearchResults: React.FC<SearchResultsProps> = ({
     setExportStatus(null);
     setExportMessage('');
     setSheetUrl('');
-  };
-
-  const formatPhoneNumber = (phone: string) => {
-    if (!phone) return '';
-    // Remove non-digits and format as needed
-    const cleaned = phone.replace(/\D/g, '');
-    if (cleaned.length === 10) {
-      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
-    }
-    return phone;
   };
 
   // Show streaming progress during search

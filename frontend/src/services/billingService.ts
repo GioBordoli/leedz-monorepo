@@ -7,7 +7,6 @@ import {
   EnhancedUsageStats,
   // Legacy types for backward compatibility
   BillingStatus,
-  CheckoutSession,
   PortalSession
 } from '../types/billing';
 

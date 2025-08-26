@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { CreditCard, CheckCircle, XCircle, AlertCircle, ExternalLink } from 'lucide-react';
 import billingService from '../../services/billingService';
 import { BillingStatus } from '../../types/billing';
@@ -16,13 +16,7 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({ className = 
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (isAuthenticated && token) {
-      fetchBillingStatus();
-    }
-  }, [isAuthenticated, token]);
-
-  const fetchBillingStatus = async () => {
+  const fetchBillingStatus = useCallback(async () => {
     if (!isAuthenticated || !token) {
       setLoading(false);
       return;
@@ -39,7 +33,13 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({ className = 
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAuthenticated, token]);
+
+  useEffect(() => {
+    if (isAuthenticated && token) {
+      fetchBillingStatus();
+    }
+  }, [isAuthenticated, token, fetchBillingStatus]);
 
   const handleSubscribe = async () => {
     if (!isAuthenticated || !token) {
